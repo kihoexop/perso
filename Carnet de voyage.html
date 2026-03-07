@@ -192,6 +192,23 @@
             callback(newPhotos);
         };
 
+        // Générateur de couleurs pour les jours
+        const getDayColor = (dayIndex) => {
+            const colors = [
+                '#3b82f6', // blue-500
+                '#ef4444', // red-500
+                '#10b981', // emerald-500
+                '#f59e0b', // amber-500
+                '#8b5cf6', // violet-500
+                '#ec4899', // pink-500
+                '#06b6d4', // cyan-500
+                '#f97316', // orange-500
+                '#6366f1', // indigo-500
+                '#84cc16'  // lime-500
+            ];
+            return colors[dayIndex % colors.length];
+        };
+
         // =====================================================================
         // COMPOSANTS EXTRAITS
         // =====================================================================
@@ -279,11 +296,12 @@
             );
         });
 
-        // Composant Map Leaflet CORRIGÉ AVEC HAUTEUR GARANTIE
-        const MapComponent = React.memo(({ activities, countryFilter }) => {
+        // Composant Map Leaflet CORRIGÉ AVEC COULEURS DYNAMIQUES ET PLANIFICATION INTÉGRÉE
+        const MapComponent = React.memo(({ activities, countryFilter, days, onAssign, getDayDisplayName }) => {
             const mapRef = useRef(null);
             const mapInstanceRef = useRef(null);
             const markersLayerRef = useRef(null);
+            const [isMapReady, setIsMapReady] = useState(false);
 
             useEffect(() => {
                 if (!mapInstanceRef.current && mapRef.current) {
@@ -296,9 +314,9 @@
                     }).addTo(mapInstanceRef.current);
                     
                     markersLayerRef.current = L.layerGroup().addTo(mapInstanceRef.current);
+                    setIsMapReady(true);
                 }
 
-                // Force Leaflet à recalculer sa taille au montage (très important dans les onglets React)
                 const resizeTimer = setTimeout(() => {
                     if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize();
                 }, 300);
@@ -307,7 +325,7 @@
             }, []);
 
             useEffect(() => {
-                if (mapInstanceRef.current && markersLayerRef.current) {
+                if (isMapReady && mapInstanceRef.current && markersLayerRef.current) {
                     markersLayerRef.current.clearLayers();
                     const bounds = [];
                     
@@ -318,20 +336,60 @@
 
                     filtered.forEach(act => {
                         if (act.coordinates?.lat && act.coordinates?.lon) {
-                            const markerColor = act.type === 'restaurant' ? '#f97316' : '#6366f1';
+                            
+                            // Logique de couleur : Noir si non planifié, couleur unique si planifié
+                            let markerColor = '#18181b'; // Noir par défaut (zinc-900)
+                            let dayLabel = 'Non planifié';
+                            
+                            if (act.dayId) {
+                                const dayIndex = days.findIndex(d => d.id === act.dayId);
+                                if (dayIndex !== -1) {
+                                    markerColor = getDayColor(dayIndex);
+                                    dayLabel = days[dayIndex].label;
+                                }
+                            }
+
+                            const isResto = act.type === 'restaurant';
+                            // Forme différente pour les restos (carré arrondi) vs visites (rond)
+                            const borderRadius = isResto ? '4px' : '50%';
+                            
                             const customIcon = L.divIcon({
                                 className: 'custom-div-icon',
-                                html: `<div style="background-color: ${markerColor}; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.4);"></div>`,
-                                iconSize: [16, 16], iconAnchor: [8, 8]
+                                html: `<div style="background-color: ${markerColor}; width: 18px; height: 18px; border-radius: ${borderRadius}; border: 2.5px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.4);"></div>`,
+                                iconSize: [18, 18], iconAnchor: [9, 9]
+                            });
+
+                            // Création du contenu de la popup sous forme d'élément DOM pour y attacher un événement
+                            const popupDiv = document.createElement('div');
+                            popupDiv.style.cssText = "text-align: center; padding: 4px; min-width: 140px;";
+                            
+                            let optionsHtml = `<option value="" disabled ${!act.dayId ? 'selected' : ''}>Planifier ce lieu...</option>`;
+                            optionsHtml += `<option value="">-- À faire (Retirer) --</option>`;
+                            days.forEach(d => {
+                                optionsHtml += `<option value="${d.id}" ${act.dayId === d.id ? 'selected' : ''}>${getDayDisplayName(d.id)}</option>`;
+                            });
+
+                            popupDiv.innerHTML = `
+                                <b style="font-size: 14px; color: #18181b;">${act.name}</b><br>
+                                <span style="font-size: 11px; color: ${markerColor}; font-weight: bold;">
+                                    ${act.dayId ? `📅 ${dayLabel}` : '📋 À faire'}
+                                </span><br>
+                                <select class="map-day-selector" style="margin-top: 8px; width: 100%; padding: 6px 4px; border-radius: 6px; border: 1px solid #e4e4e7; font-size: 12px; background: #f4f4f5; color: #18181b; outline: none; cursor: pointer;">
+                                    ${optionsHtml}
+                                </select>
+                                <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(act.address)}" target="_blank" style="display: inline-block; margin-top: 8px; background: #18181b; color: white; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: bold; width: 100%; box-sizing: border-box;">Ouvrir Maps</a>
+                            `;
+
+                            // On écoute le changement de valeur dans le menu déroulant
+                            const selectEl = popupDiv.querySelector('.map-day-selector');
+                            selectEl.addEventListener('change', (e) => {
+                                if (onAssign) onAssign(act, e.target.value);
+                                if (mapInstanceRef.current) mapInstanceRef.current.closePopup();
                             });
 
                             const marker = L.marker([act.coordinates.lat, act.coordinates.lon], {icon: customIcon})
-                                .bindPopup(`
-                                    <div style="text-align: center; padding: 4px; min-width: 120px;">
-                                        <b style="font-size: 14px;">${act.name}</b><br>
-                                        <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(act.address)}" target="_blank" style="display: inline-block; margin-top: 8px; background: #18181b; color: white; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: bold;">Ouvrir Maps</a>
-                                    </div>
-                                `);
+                                .bindPopup(popupDiv);
+                                
                             markersLayerRef.current.addLayer(marker);
                             bounds.push([act.coordinates.lat, act.coordinates.lon]);
                         }
@@ -343,9 +401,14 @@
                         mapInstanceRef.current.setView([20, 0], 2);
                     }
                 }
-            }, [activities, countryFilter]);
+            }, [activities, countryFilter, isMapReady, days]);
 
-            return <div ref={mapRef} style={{ width: '100%', height: '100%', zIndex: 1 }} />;
+            return (
+                <div className="w-full h-full relative bg-zinc-100 flex items-center justify-center">
+                    {!isMapReady && <div className="text-zinc-400 text-sm flex items-center gap-2"><Icon name="loader" className="animate-spin" /> Chargement carte...</div>}
+                    <div ref={mapRef} className="absolute inset-0 z-10" />
+                </div>
+            );
         });
 
         // =====================================================================
@@ -584,7 +647,7 @@
                             {/* CARTE */}
                             {activeTab === 'map' && (
                                 <section className="animate-in fade-in duration-200 space-y-4">
-                                    <div className="flex justify-between items-center">
+                                    <div className="flex justify-between items-center mb-4">
                                         <h2 className="text-sm font-semibold text-zinc-800 uppercase tracking-wide">Carte globale</h2>
                                         <select value={mapCountryFilter} onChange={(e) => setMapCountryFilter(e.target.value)} className="bg-white border border-zinc-200 text-zinc-700 text-xs py-1.5 px-3 rounded-lg outline-none shadow-sm">
                                             <option value="all">Tous les pays</option>
@@ -594,12 +657,12 @@
                                     
                                     {/* Conteneur avec HAUTEUR FIXE pour empêcher le bug d'affichage */}
                                     <div className="w-full h-[50vh] min-h-[350px] bg-zinc-200 rounded-xl overflow-hidden shadow-inner border border-zinc-300 relative z-0">
-                                        <MapComponent activities={activities} countryFilter={mapCountryFilter} />
+                                        <MapComponent activities={activities} countryFilter={mapCountryFilter} days={settings.days} onAssign={assignActivityToDay} getDayDisplayName={getDayDisplayName} />
                                     </div>
                                     
                                     <div className="space-y-2">
                                         <p className="text-[10px] text-zinc-500 text-center">
-                                            Tous vos lieux (À faire et Planifiés) s'affichent sur la carte.
+                                            Les points <b className="text-zinc-900">noirs</b> sont "À faire". Les lieux planifiés sont colorés par jour.
                                         </p>
                                         
                                         {/* Liste des lieux introuvables */}
@@ -651,8 +714,8 @@
                             {activeTab === 'planner' && (
                                 <section className="animate-in fade-in duration-200 space-y-5">
                                     <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide items-center">
-                                        {settings.days.map(day => (
-                                            <button key={day.id} onClick={() => setActiveDayId(day.id)} className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium border ${activeDayId === day.id ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-zinc-600 border-zinc-200'}`}>
+                                        {settings.days.map((day, idx) => (
+                                            <button key={day.id} onClick={() => setActiveDayId(day.id)} className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium border ${activeDayId === day.id ? 'text-white shadow-md border-transparent' : 'bg-white text-zinc-600 border-zinc-200'}`} style={activeDayId === day.id ? { backgroundColor: getDayColor(idx) } : {}}>
                                                 {getDayDisplayName(day.id)}
                                             </button>
                                         ))}
