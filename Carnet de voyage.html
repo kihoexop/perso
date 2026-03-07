@@ -5,15 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Mon Grand Voyage</title>
     
-    <!-- Chargement des styles Tailwind -->
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     
-    <!-- Chargement de React et Babel -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Chargement de Firebase (Version Compat) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
@@ -21,19 +21,17 @@
     <style>
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-        /* Adoucit le tap sur mobile */
         * { -webkit-tap-highlight-color: transparent; }
     </style>
 </head>
 <body class="bg-zinc-100 text-zinc-800 antialiased">
     <div id="root"></div>
 
-    <!-- Application React -->
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
         // =====================================================================
-        // VOTRE CONFIGURATION FIREBASE EXACTE
+        // CONFIGURATION
         // =====================================================================
         const FIREBASE_CONFIG = {
           apiKey: "AIzaSyBhjOWnWkt8-NsFVP7I2ElrvleB_PgZ1vI",
@@ -44,9 +42,18 @@
           appId: "1:347227768530:web:e98e3ac3a279f84cc6cf0b",
           measurementId: "G-P5PY64DP0S"
         };
-        // =====================================================================
 
-        // Les moments de la journée pour structurer le planning
+        if (!firebase.apps.length) { firebase.initializeApp(FIREBASE_CONFIG); }
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        
+        try {
+            db.settings({ experimentalForceLongPolling: true, ignoreUndefinedProperties: true });
+            db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+        } catch (e) {}
+
+        const tripId = "notre_grand_voyage_2024"; 
+
         const PERIODS = [
             { id: 'breakfast', label: 'Petit déjeuner', icon: '🥐' },
             { id: 'morning', label: 'Matinée', icon: '🌅' },
@@ -56,88 +63,284 @@
             { id: 'evening', label: 'Soirée', icon: '🌙' }
         ];
 
-        // Composant d'icônes SVG fines et professionnelles
-        const Icon = ({ name, size = 20, className = "" }) => {
-            const icons = {
-                map: <g><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"></path><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></g>,
-                list: <g><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></g>,
-                calendar: <g><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></g>,
-                book: <g><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></g>,
-                plus: <g><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></g>,
-                camera: <g><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></g>,
-                settings: <g><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></g>,
-                x: <g><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></g>,
-                edit: <g><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></g>,
-                trash: <g><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></g>,
-                pin: <g><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></g>,
-                hotel: <g><path d="M3 21h18"></path><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"></path><path d="M9 7h6"></path><path d="M9 11h6"></path><path d="M9 15h6"></path></g>,
-                utensils: <g><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"></path><path d="M7 2v20"></path><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"></path></g>,
-                sparkles: <g><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></g>,
-                navigation: <g><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></g>,
-                image: <g><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></g>,
-                check: <g><polyline points="20 6 9 17 4 12"></polyline></g>,
-                loader: <g><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></g>,
-                download: <g><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></g>,
-                clock: <g><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></g>,
-                youtube: <g><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.42a2.78 2.78 0 0 0-1.94 2C1 8.17 1 12 1 12s0 3.83.46 5.58a2.78 2.78 0 0 0 1.94 2C5.12 20 12 20 12 20s6.88 0 8.6-.42a2.78 2.78 0 0 0 1.94-2C23 15.83 23 12 23 12s0-3.83-.46-5.58z"></path><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02"></polygon></g>,
-                search: <g><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></g>,
-                link: <g><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></g>,
-                "chevron-down": <g><polyline points="6 9 12 15 18 9"></polyline></g>,
-                "chevron-up": <g><polyline points="18 15 12 9 6 15"></polyline></g>,
-                globe: <g><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></g>
-            };
-            return (
-                <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                    {icons[name] || null}
-                </svg>
-            );
-        };
-
-        // Utilitaire sécurisé pour lire le LocalStorage
+        // =====================================================================
+        // UTILITAIRES
+        // =====================================================================
         const safeGetLocal = (key) => { try { return localStorage.getItem(key) || ''; } catch(e) { return ''; } };
         const safeSetLocal = (key, value) => { try { localStorage.setItem(key, value); } catch(e) {} };
-        const safeRemoveLocal = (key) => { try { localStorage.removeItem(key); } catch(e) {} };
+        
+        // Optimisation: Dictionnaire d'icônes extrait du composant pour éviter la recréation
+        const SVG_ICONS = {
+            map: <g><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"></path><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></g>,
+            "map-pin": <g><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></g>,
+            list: <g><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></g>,
+            calendar: <g><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></g>,
+            book: <g><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></g>,
+            plus: <g><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></g>,
+            camera: <g><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></g>,
+            settings: <g><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></g>,
+            x: <g><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></g>,
+            edit: <g><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></g>,
+            trash: <g><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></g>,
+            pin: <g><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></g>,
+            hotel: <g><path d="M3 21h18"></path><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"></path><path d="M9 7h6"></path><path d="M9 11h6"></path><path d="M9 15h6"></path></g>,
+            utensils: <g><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"></path><path d="M7 2v20"></path><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"></path></g>,
+            sparkles: <g><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></g>,
+            navigation: <g><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></g>,
+            image: <g><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></g>,
+            check: <g><polyline points="20 6 9 17 4 12"></polyline></g>,
+            loader: <g><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></g>,
+            download: <g><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></g>,
+            clock: <g><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></g>,
+            search: <g><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></g>,
+            link: <g><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></g>,
+            "chevron-down": <g><polyline points="6 9 12 15 18 9"></polyline></g>,
+            "chevron-up": <g><polyline points="18 15 12 9 6 15"></polyline></g>,
+            globe: <g><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></g>
+        };
 
-        function App() {
-            if (!firebase.apps.length) { firebase.initializeApp(FIREBASE_CONFIG); }
-            const auth = firebase.auth();
-            const db = firebase.firestore();
+        const Icon = React.memo(({ name, size = 20, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                {SVG_ICONS[name]}
+            </svg>
+        ));
+
+        const detectCountry = (address) => {
+            if (!address) return null;
+            const addr = address.toLowerCase();
+            if (addr.includes('japon') || addr.includes('japan') || addr.includes('tokyo') || addr.includes('osaka') || addr.includes('kyoto')) return 'Japon';
+            if (addr.includes('macao') || addr.includes('macau')) return 'Macao';
+            if (addr.includes('hong kong') || addr.includes('hong-kong')) return 'Hong Kong';
+            if (addr.includes('corée') || addr.includes('korea') || addr.includes('seoul')) return 'Corée du Sud';
+            if (addr.includes('chine') || addr.includes('china') || addr.includes('pekin') || addr.includes('shanghai')) return 'Chine';
+            if (addr.includes('france') || addr.includes('paris')) return 'France';
             
-            // Applique un réglage pour ignorer l'erreur "Could not reach Cloud Firestore backend" dans la console.
-            // Firestore continuera de fonctionner hors ligne et se synchronisera dès que la connexion sera rétablie.
-            try {
-                db.settings({ experimentalForceLongPolling: true, merge: true });
-            } catch (e) {
-                // Settings peuvent déjà être initialisés
+            const parts = address.split(',');
+            if (parts.length > 1) {
+                let last = parts[parts.length - 1].replace(/[0-9-]/g, '').trim(); 
+                if (last.length >= 3 && last.length <= 25) return last.charAt(0).toUpperCase() + last.slice(1).toLowerCase();
             }
-            
-            const tripId = "notre_grand_voyage_2024"; 
+            return null;
+        };
 
-            // États
+        const geocodeAddress = async (address) => {
+            if (!address || address === 'À définir') return { coords: null, fromCache: false };
+            const cacheKey = `geocode_v2_${address.trim().toLowerCase()}`;
+            const cached = safeGetLocal(cacheKey);
+            if (cached) {
+                try {
+                    const parsed = JSON.parse(cached);
+                    return { coords: parsed === 'not_found' ? null : parsed, fromCache: true };
+                } catch (e) {}
+            }
+            await new Promise(r => setTimeout(r, 2000));
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`, { headers: { 'User-Agent': 'MonGrandVoyageApp/1.0' } });
+                if (!res.ok) return { coords: null, fromCache: false };
+                const data = await res.json();
+                if (data && data.length > 0) {
+                    const coords = { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+                    safeSetLocal(cacheKey, JSON.stringify(coords));
+                    return { coords, fromCache: false };
+                }
+            } catch (e) {}
+            safeSetLocal(cacheKey, JSON.stringify('not_found'));
+            return { coords: null, fromCache: false };
+        };
+
+        const handleImageUpload = async (e, callback) => {
+            const files = Array.from(e.target.files);
+            if (!files.length) return;
+            const newPhotos = [];
+            for (const file of files) {
+                const base64 = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const img = new window.Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const MAX_WIDTH = 800;
+                            let scaleSize = img.width > MAX_WIDTH ? MAX_WIDTH / img.width : 1;
+                            canvas.width = img.width * scaleSize; canvas.height = img.height * scaleSize;
+                            const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                            resolve(canvas.toDataURL('image/jpeg', 0.6));
+                        };
+                        img.src = event.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                });
+                newPhotos.push(base64);
+            }
+            callback(newPhotos);
+        };
+
+        // =====================================================================
+        // COMPOSANTS EXTRAITS
+        // =====================================================================
+
+        // Composant Carte d'Activité
+        const ActivityCard = React.memo(({ activity, isPlanner, showTime, showCountry, isExpanded, onToggle, onEdit, onDelete, onAssign, getDayDisplayName, days }) => {
+            const borderColor = activity.type === 'restaurant' ? 'border-l-orange-400' : 'border-l-blue-400';
+            const displayCountry = activity.country || detectCountry(activity.address);
+            
+            return (
+                <div className={`bg-white border border-zinc-200 rounded-xl shadow-sm overflow-hidden border-l-4 ${borderColor}`}>
+                    <div onClick={() => onToggle(activity.id)} className="flex justify-between items-center p-3 cursor-pointer hover:bg-zinc-50 transition-colors">
+                        <div className="flex items-center gap-3 overflow-hidden pr-2">
+                            {showTime && activity.time && <span className="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2 py-1 rounded-md flex-shrink-0">{activity.time}</span>}
+                            <div className="flex flex-col truncate">
+                                <h4 className="font-semibold text-zinc-900 truncate">{activity.name}</h4>
+                                {showCountry && displayCountry && (
+                                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mt-0.5 flex items-center gap-1">
+                                        <Icon name="globe" size={10} /> {displayCountry}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                        <div className="text-zinc-400 flex-shrink-0">
+                            <Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} />
+                        </div>
+                    </div>
+
+                    {isExpanded && (
+                        <div className="p-3 border-t border-zinc-100 bg-zinc-50/50 animate-in fade-in duration-200">
+                            <p className="text-sm text-zinc-500 flex items-start gap-1.5 leading-snug">
+                                <Icon name="pin" size={14} className={`mt-0.5 flex-shrink-0 ${activity.type === 'restaurant' ? 'text-orange-500' : 'text-blue-500'}`} />
+                                {activity.address}
+                            </p>
+
+                            {activity.duration && (
+                                <p className="text-xs text-zinc-600 flex items-center gap-1.5 mt-2 font-medium bg-zinc-200/50 inline-flex px-2 py-1 rounded-md">
+                                    <Icon name="clock" size={12} /> Durée est. : {activity.duration}
+                                </p>
+                            )}
+                            
+                            {activity.url && (
+                                <a href={activity.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors bg-indigo-100/50 px-2 py-1 rounded-md border border-indigo-100">
+                                    <Icon name={activity.url.includes('youtu') ? 'youtube' : 'link'} size={12} /> Ouvrir le lien
+                                </a>
+                            )}
+                            
+                            {activity.notes && <p className="text-xs text-zinc-600 mt-2.5 italic border-l-2 border-indigo-200 pl-2 leading-relaxed">"{activity.notes}"</p>}
+                            
+                            {activity.photos?.length > 0 && (
+                                <div className="flex gap-2 overflow-x-auto mt-2.5 pb-1 scrollbar-hide">
+                                    {activity.photos.map((p, i) => <img key={i} src={p} className="w-16 h-16 rounded-md object-cover flex-shrink-0 border border-zinc-200 shadow-sm" />)}
+                                </div>
+                            )}
+
+                            <div className="flex flex-wrap gap-2 pt-3 mt-3 border-t border-zinc-200/60">
+                                <button onClick={() => onEdit(activity)} className="flex-1 flex justify-center items-center gap-1.5 text-xs font-medium text-zinc-600 bg-white border border-zinc-200 py-2 rounded-lg hover:bg-zinc-100">
+                                    <Icon name="edit" size={14} /> Modifier
+                                </button>
+                                
+                                {isPlanner ? (
+                                    <>
+                                        <button onClick={() => onAssign(activity, '')} className="flex-1 flex justify-center items-center gap-1.5 text-xs font-medium text-zinc-600 bg-white border border-zinc-200 py-2 rounded-lg hover:bg-zinc-100">
+                                            <Icon name="list" size={14} /> Retirer
+                                        </button>
+                                        <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(activity.address)}&travelmode=transit`} target="_blank" className="w-full sm:flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-white bg-indigo-600 py-2 rounded-lg hover:bg-indigo-700">
+                                            <Icon name="navigation" size={14} /> S'y rendre
+                                        </a>
+                                    </>
+                                ) : (
+                                    <button onClick={() => onDelete(activity.id)} className="flex-1 flex justify-center items-center gap-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-100 py-2 rounded-lg hover:bg-red-100">
+                                        <Icon name="trash" size={14} /> Supprimer
+                                    </button>
+                                )}
+
+                                {!isPlanner && (
+                                    <select className="w-full bg-white text-zinc-700 text-xs font-medium p-2 rounded-lg border border-zinc-200" value="" onChange={(e) => onAssign(activity, e.target.value)}>
+                                        <option value="" disabled>Planifier ce lieu...</option>
+                                        {days.map(d => <option key={d.id} value={d.id}>{getDayDisplayName(d.id)}</option>)}
+                                    </select>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        });
+
+        // Composant Map Leaflet
+        const MapComponent = React.memo(({ activities, countryFilter }) => {
+            const mapRef = useRef(null);
+            const mapInstanceRef = useRef(null);
+            const markersLayerRef = useRef(null);
+
+            useEffect(() => {
+                if (!mapInstanceRef.current && mapRef.current) {
+                    mapInstanceRef.current = L.map(mapRef.current).setView([20, 0], 2);
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '&copy; OSM', maxZoom: 19 }).addTo(mapInstanceRef.current);
+                    markersLayerRef.current = L.layerGroup().addTo(mapInstanceRef.current);
+                }
+
+                if (mapInstanceRef.current && markersLayerRef.current) {
+                    markersLayerRef.current.clearLayers();
+                    const bounds = [];
+                    
+                    const filtered = countryFilter === 'all' ? activities : activities.filter(a => {
+                        const actCountry = a.country && a.country.trim() !== '' ? a.country.trim() : 'Autres destinations';
+                        return actCountry === countryFilter;
+                    });
+
+                    filtered.forEach(act => {
+                        if (act.coordinates?.lat && act.coordinates?.lon) {
+                            const markerColor = act.type === 'restaurant' ? '#f97316' : '#6366f1';
+                            const customIcon = L.divIcon({
+                                className: 'custom-div-icon',
+                                html: `<div style="background-color: ${markerColor}; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>`,
+                                iconSize: [14, 14], iconAnchor: [7, 7]
+                            });
+
+                            const marker = L.marker([act.coordinates.lat, act.coordinates.lon], {icon: customIcon})
+                                .bindPopup(`
+                                    <div style="text-align: center; padding: 4px;">
+                                        <b style="font-size: 14px;">${act.name}</b><br>
+                                        <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(act.address)}" target="_blank" style="display: inline-block; margin-top: 8px; background: #18181b; color: white; padding: 4px 10px; border-radius: 6px; text-decoration: none; font-size: 11px;">Ouvrir Maps</a>
+                                    </div>
+                                `);
+                            markersLayerRef.current.addLayer(marker);
+                            bounds.push([act.coordinates.lat, act.coordinates.lon]);
+                        }
+                    });
+
+                    if (bounds.length > 0) mapInstanceRef.current.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
+                    else if (countryFilter === 'all') mapInstanceRef.current.setView([20, 0], 2);
+                }
+                
+                setTimeout(() => mapInstanceRef.current?.invalidateSize(), 100);
+            }, [activities, countryFilter]);
+
+            return <div ref={mapRef} style={{ width: '100%', height: '100%', zIndex: 1 }} />;
+        });
+
+        // =====================================================================
+        // APPLICATION PRINCIPALE
+        // =====================================================================
+        function App() {
             const [user, setUser] = useState(null);
             const [isInitializing, setIsInitializing] = useState(true);
             const [authError, setAuthError] = useState(null);
+            
+            // Données
             const [activities, setActivities] = useState([]);
+            const [settings, setSettings] = useState({ startDate: '', days: [{ id: 'day-1', label: 'Jour 1', hotelAddress: '' }] });
             
-            // Paramètres globaux (dont la date de début)
-            const [settings, setSettings] = useState({ 
-                startDate: '', 
-                days: [{ id: 'day-1', label: 'Jour 1', hotelAddress: '' }] 
-            });
-            
+            // Navigation & UI
             const [activeTab, setActiveTab] = useState('backlog');
             const [activeDayId, setActiveDayId] = useState('day-1');
             const [journalFilter, setJournalFilter] = useState('all');
-            
-            // Gestion des cartes ouvertes (Accordéon)
+            const [mapCountryFilter, setMapCountryFilter] = useState('all');
             const [expandedIds, setExpandedIds] = useState(new Set());
             
+            // Modales
             const [isModalOpen, setIsModalOpen] = useState(false);
             const [isJournalModalOpen, setIsJournalModalOpen] = useState(false);
             const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-            const [editingActivity, setEditingActivity] = useState(null);
             
-            // Formulaire (Ajout du champ "country" et "duration")
+            // Formulaires & IA
+            const [editingActivity, setEditingActivity] = useState(null);
             const [activityForm, setActivityForm] = useState({ name: '', type: 'visite', address: '', country: '', duration: '', time: '10:00', dayId: '', url: '', photos: [], notes: '', period: 'morning' });
             
             const [geminiKey, setGeminiKey] = useState(safeGetLocal('gemini_api_key'));
@@ -149,1092 +352,339 @@
             const [aiQuery, setAiQuery] = useState('');
             const [aiSuggestion, setAiSuggestion] = useState(null);
             const [isAiLoading, setIsAiLoading] = useState(false);
-            
             const [aiHotelQuery, setAiHotelQuery] = useState('');
             const [aiHotelSuggestion, setAiHotelSuggestion] = useState(null);
             const [isHotelAiLoading, setIsHotelAiLoading] = useState(false);
-            
             const [isAiRewriting, setIsAiRewriting] = useState(false);
-
-            // Nouveaux états pour la mise à jour en masse
             const [isUpdatingData, setIsUpdatingData] = useState(false);
             const [updateMessage, setUpdateMessage] = useState('');
 
-            // États YouTube
-            const [ytSearchQuery, setYtSearchQuery] = useState('');
-            const [ytLinkInput, setYtLinkInput] = useState('');
-
+            // INIT FIREBASE
             useEffect(() => {
-                const fallbackTimer = setTimeout(() => {
-                    // Ne pas bloquer l'initialisation si Firebase est lent
-                    setIsInitializing(false);
-                }, 6000); 
-
-                auth.signInAnonymously().catch((error) => {
-                    setAuthError("Connexion Firebase restreinte, utilisation locale possible. (" + error.message + ")");
-                    setIsInitializing(false);
-                    clearTimeout(fallbackTimer);
-                });
-                    
-                const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-                    if(currentUser) { 
-                        setUser(currentUser); 
-                        setAuthError(null); 
-                    }
-                    setIsInitializing(false);
-                    clearTimeout(fallbackTimer);
-                });
-                return () => { unsubscribe(); clearTimeout(fallbackTimer); };
+                const init = async () => {
+                    try { await auth.signInAnonymously(); } catch (e) { setAuthError(e.message); }
+                };
+                init();
+                return auth.onAuthStateChanged((u) => { setUser(u); setIsInitializing(false); });
             }, []);
 
+            // LOAD DATA
             useEffect(() => {
                 if (!user) return;
-                
-                let unsubSettings = () => {};
-                let unsubActivities = () => {};
-
-                try {
-                    const settingsRef = db.doc(`trips/${tripId}/settings/main`);
-                    unsubSettings = settingsRef.onSnapshot((docSnap) => {
-                        if (docSnap.exists) {
-                            const data = docSnap.data();
-                            setSettings({ 
-                                startDate: data.startDate || '',
-                                days: data.days && data.days.length > 0 ? data.days : [{ id: 'day-1', label: 'Jour 1', hotelAddress: '' }] 
-                            });
-                            if (data.days && data.days.length > 0 && !data.days.find(d => d.id === activeDayId)) setActiveDayId(data.days[0].id);
-                        } else { 
-                            settingsRef.set({ startDate: '', days: [{ id: 'day-1', label: 'Jour 1', hotelAddress: '' }] }); 
-                        }
-                    }, (error) => {
-                        console.warn("Erreur de lecture Firestore (Paramètres):", error);
-                    });
-
-                    const activitiesRef = db.collection(`trips/${tripId}/activities`);
-                    unsubActivities = activitiesRef.onSnapshot((snapshot) => {
-                        const acts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        setActivities(acts);
-                    }, (error) => {
-                        console.warn("Erreur de lecture Firestore (Activités):", error);
-                    });
-                } catch (err) {
-                    console.error("Impossible d'initialiser les écouteurs Firestore", err);
-                }
-                
-                return () => { unsubSettings(); unsubActivities(); };
+                const unsubSet = db.doc(`trips/${tripId}/settings/main`).onSnapshot(doc => {
+                    if (doc.exists) {
+                        const d = doc.data();
+                        setSettings({ startDate: d.startDate || '', days: d.days?.length ? d.days : [{ id: 'day-1', label: 'Jour 1' }] });
+                        if (d.days?.length && !d.days.find(x => x.id === activeDayId)) setActiveDayId(d.days[0].id);
+                    }
+                });
+                const unsubAct = db.collection(`trips/${tripId}/activities`).onSnapshot(snap => {
+                    setActivities(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+                });
+                return () => { unsubSet(); unsubAct(); };
             }, [user]);
 
-            // === GESTION DES DATES INTELLIGENTES ===
-            const getDayDisplayName = (dayId) => {
+            // GEOCODING WORKER
+            useEffect(() => {
+                if (!user || activeTab !== 'map') return;
+                const toGeocode = activities.filter(a => !a.coordinates && a.address && a.address !== 'À définir');
+                if (!toGeocode.length) return;
+                
+                let isMounted = true;
+                let i = 0;
+                const run = async () => {
+                    if (i < toGeocode.length && activeTab === 'map' && isMounted) {
+                        const act = toGeocode[i];
+                        const { coords } = await geocodeAddress(act.address);
+                        if (coords) await db.doc(`trips/${tripId}/activities/${act.id}`).update({ coordinates: coords });
+                        i++;
+                        setTimeout(run, 50);
+                    }
+                };
+                run();
+                return () => { isMounted = false; };
+            }, [activities, user, activeTab]);
+
+            // CALCULS MEMORISÉS (Optimisation Performance)
+            const getDayDisplayName = useCallback((dayId) => {
                 const index = settings.days.findIndex(d => d.id === dayId);
                 if (index === -1) return 'Jour inconnu';
-                
-                const fallbackLabel = settings.days[index].label; // ex: "Jour 1"
-                if (!settings.startDate) return fallbackLabel;
-                
+                const fallback = settings.days[index].label;
+                if (!settings.startDate) return fallback;
                 const date = new Date(settings.startDate);
-                if (isNaN(date.getTime())) return fallbackLabel;
-                
+                if (isNaN(date.getTime())) return fallback;
                 date.setDate(date.getDate() + index);
                 const strDate = date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' });
-                // Mettre la première lettre en majuscule (Ex: "Lundi 12 oct.")
                 return strDate.charAt(0).toUpperCase() + strDate.slice(1);
-            };
+            }, [settings]);
 
-            const validateGeminiKey = async () => {
-                if (!tempKeyInput) return;
-                setIsKeyValidating(true); setKeyValidationError('');
-                try {
-                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${tempKeyInput}`);
-                    if (!response.ok) throw new Error("Clé API invalide ou refusée.");
-                    const data = await response.json();
-                    const validModels = data.models.filter(m => m.supportedGenerationMethods?.includes('generateContent'));
-                    if (!validModels.length) throw new Error("Aucun modèle compatible trouvé.");
-                    
-                    let detectedModel = '';
-                    const flashModel = validModels.find(m => m.name.includes('gemini-1.5-flash'));
-                    const proModel = validModels.find(m => m.name.includes('gemini-1.5-pro'));
-                    if (flashModel) detectedModel = flashModel.name.replace('models/', '');
-                    else if (proModel) detectedModel = proModel.name.replace('models/', '');
-                    else detectedModel = validModels[0].name.replace('models/', '');
+            const { backlogByCountry, sortedCountries } = useMemo(() => {
+                const backlog = activities.filter(a => !a.dayId);
+                const grouped = backlog.reduce((acc, act) => {
+                    let c = act.country?.trim() || detectCountry(act.address) || 'Autres destinations';
+                    if (!acc[c]) acc[c] = [];
+                    acc[c].push(act);
+                    return acc;
+                }, {});
+                const sorted = Object.keys(grouped).sort((a, b) => a === 'Autres destinations' ? 1 : b === 'Autres destinations' ? -1 : a.localeCompare(b));
+                return { backlogByCountry: grouped, sortedCountries: sorted };
+            }, [activities]);
 
-                    setGeminiKey(tempKeyInput); setGeminiModel(detectedModel);
-                    safeSetLocal('gemini_api_key', tempKeyInput); safeSetLocal('gemini_model_id', detectedModel);
-                    setTempKeyInput('');
-                } catch (error) {
-                    setKeyValidationError(error.message); setGeminiKey(''); setGeminiModel('');
-                    safeRemoveLocal('gemini_api_key'); safeRemoveLocal('gemini_model_id');
-                }
-                setIsKeyValidating(false);
-            };
+            const plannedActivitiesByPeriod = useMemo(() => {
+                const grouped = {};
+                PERIODS.forEach(p => grouped[p.id] = []);
+                activities.filter(a => a.dayId === activeDayId).sort((a, b) => (a.time || '').localeCompare(b.time || '')).forEach(act => {
+                    const p = act.period || 'morning';
+                    if (grouped[p]) grouped[p].push(act);
+                });
+                return grouped;
+            }, [activities, activeDayId]);
 
-            const handleExportJson = () => {
-                const exportData = { version: "1.0", exportDate: new Date().toISOString(), modelId: geminiModel || "non-configure", settings: settings, activities: activities };
-                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
-                const downloadAnchorNode = document.createElement('a');
-                downloadAnchorNode.setAttribute("href", dataStr); downloadAnchorNode.setAttribute("download", "mon_voyage_export.json");
-                document.body.appendChild(downloadAnchorNode); downloadAnchorNode.click(); downloadAnchorNode.remove();
-            };
+            const journalActivities = useMemo(() => {
+                return activities.filter(a => a.dayId && (journalFilter === 'all' || a.dayId === journalFilter)).sort((a, b) => {
+                    const dA = settings.days.findIndex(d => d.id === a.dayId), dB = settings.days.findIndex(d => d.id === b.dayId);
+                    if (dA !== dB) return dA - dB;
+                    return (a.time || '').localeCompare(b.time || '');
+                });
+            }, [activities, journalFilter, settings.days]);
 
-            // === UTILITAIRE DE MISE A JOUR EN MASSE ===
-            const handleAutoFillMissingData = async () => {
-                if (!user) return;
-                setIsUpdatingData(true);
-                setUpdateMessage('');
-                try {
-                    const batch = db.batch();
-                    let count = 0;
-                    activities.forEach(act => {
-                        let needsUpdate = false;
-                        let updates = {};
+            // ACTIONS
+            const toggleExpand = useCallback((id) => {
+                setExpandedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+            }, []);
 
-                        // Remplissage automatique de la durée si manquante
-                        if (!act.duration || act.duration.trim() === '') {
-                            updates.duration = act.type === 'restaurant' ? '1h30' : '2h00';
-                            needsUpdate = true;
-                        }
-                        
-                        // Remplissage automatique du pays si manquant et détectable
-                        if (!act.country && act.address) {
-                            const detected = detectCountry(act.address);
-                            if (detected) {
-                                updates.country = detected;
-                                needsUpdate = true;
-                            }
-                        }
+            const deleteActivity = useCallback(async (id) => user && await db.doc(`trips/${tripId}/activities/${id}`).delete(), [user]);
+            const assignActivityToDay = useCallback(async (activity, dayId) => user && await db.doc(`trips/${tripId}/activities/${activity.id}`).update({ dayId: dayId || '' }), [user]);
+            const updateDayHotel = useCallback((address) => user && db.doc(`trips/${tripId}/settings/main`).set({ ...settings, days: settings.days.map(d => d.id === activeDayId ? { ...d, hotelAddress: address } : d) }, {merge:true}), [user, settings, activeDayId]);
+            const handleAddDay = useCallback(() => user && db.doc(`trips/${tripId}/settings/main`).set({ ...settings, days: [...settings.days, { id: `day-${Date.now()}`, label: `Jour ${settings.days.length + 1}`, hotelAddress: '' }] }, {merge:true}), [user, settings]);
 
-                        if (needsUpdate) {
-                            const docRef = db.doc(`trips/${tripId}/activities/${act.id}`);
-                            batch.update(docRef, updates);
-                            count++;
-                        }
-                    });
-
-                    if (count > 0) {
-                        await batch.commit();
-                        setUpdateMessage(`${count} activité(s) mise(s) à jour !`);
-                    } else {
-                        setUpdateMessage("Tout est déjà à jour.");
-                    }
-                } catch (error) {
-                    setUpdateMessage("Erreur lors de la mise à jour.");
-                }
-                setIsUpdatingData(false);
-                setTimeout(() => setUpdateMessage(''), 4000);
-            };
-
-            // === UTILITAIRE DE DÉTECTION AUTO DE PAYS ===
-            const detectCountry = (address) => {
-                if (!address) return null;
-                const addrLower = address.toLowerCase();
-                
-                // Détection par mots-clés courants
-                if (addrLower.includes('japon') || addrLower.includes('japan') || addrLower.includes('tokyo') || addrLower.includes('osaka') || addrLower.includes('kyoto')) return 'Japon';
-                if (addrLower.includes('macao') || addrLower.includes('macau')) return 'Macao';
-                if (addrLower.includes('hong kong') || addrLower.includes('hong-kong')) return 'Hong Kong';
-                if (addrLower.includes('corée') || addrLower.includes('korea') || addrLower.includes('seoul') || addrLower.includes('séoul')) return 'Corée du Sud';
-                if (addrLower.includes('chine') || addrLower.includes('china') || addrLower.includes('pekin') || addrLower.includes('shanghai')) return 'Chine';
-                if (addrLower.includes('france') || addrLower.includes('paris')) return 'France';
-                
-                // Détection générique en prenant la fin de l'adresse (souvent le pays)
-                const parts = address.split(',');
-                if (parts.length > 1) {
-                    let lastPart = parts[parts.length - 1].trim();
-                    // Retrait des codes postaux (chiffres) et tirets
-                    lastPart = lastPart.replace(/[0-9-]/g, '').trim(); 
-                    if (lastPart.length >= 3 && lastPart.length <= 25) {
-                        return lastPart.charAt(0).toUpperCase() + lastPart.slice(1).toLowerCase();
-                    }
-                }
-                return null;
-            };
-
-            const saveSettings = async (newSettings) => { 
-                if (user) { 
-                    setSettings(newSettings); 
-                    try {
-                        await db.doc(`trips/${tripId}/settings/main`).set(newSettings); 
-                    } catch (e) {
-                        console.warn("Échec de la sauvegarde Firestore, données enregistrées localement temporairement", e);
-                    }
-                } 
-            };
-            const handleAddDay = () => saveSettings({ ...settings, days: [...settings.days, { id: `day-${Date.now()}`, label: `Jour ${settings.days.length + 1}`, hotelAddress: '' }] });
-            const updateDayHotel = (address) => saveSettings({ ...settings, days: settings.days.map(d => d.id === activeDayId ? { ...d, hotelAddress: address } : d) });
+            const openActivityModal = useCallback((activity = null) => {
+                setEditingActivity(activity);
+                setActivityForm(activity ? { ...activity, photos: activity.photos || [] } : { name: '', type: 'visite', address: '', country: '', duration: '', time: '10:00', period: 'morning', dayId: activeTab === 'planner' ? activeDayId : '', url: '', photos: [], notes: '' });
+                setIsModalOpen(true);
+            }, [activeTab, activeDayId]);
 
             const saveActivity = async (e) => {
                 e.preventDefault();
-                if (!activityForm.name || (!activityForm.address && !activityForm.url)) return;
-                
-                // Auto-détection du pays à la sauvegarde si le champ est vide
-                let finalCountry = activityForm.country;
-                if (!finalCountry && activityForm.address) {
-                    finalCountry = detectCountry(activityForm.address) || '';
-                }
-
-                const dataToSave = { ...activityForm, country: finalCountry };
-
-                try {
-                    const activitiesRef = db.collection(`trips/${tripId}/activities`);
-                    if (editingActivity) await db.doc(`trips/${tripId}/activities/${editingActivity.id}`).update(dataToSave);
-                    else await activitiesRef.add(dataToSave);
-                } catch (e) {
-                    console.warn("Échec de la sauvegarde Firestore de l'activité.", e);
-                }
-                closeActivityModal();
-            };
-
-            const deleteActivity = async (id) => {
-                if(user) {
-                     try {
-                         await db.doc(`trips/${tripId}/activities/${id}`).delete();
-                     } catch(e) {
-                         console.warn("Échec de la suppression Firestore", e);
-                     }
-                }
-            };
-            const assignActivityToDay = async (activity, dayId) => {
-                 if(user) {
-                     try {
-                        await db.doc(`trips/${tripId}/activities/${activity.id}`).update({ dayId: dayId || '' });
-                     } catch(e) {
-                         console.warn("Échec de l'assignation Firestore", e);
-                     }
-                 }
-            }
-
-            const saveJournalEntry = async (updatedActivity) => {
-                if (!user) return;
-                const { id, ...dataToSave } = updatedActivity;
-                try {
-                    if (id) await db.doc(`trips/${tripId}/activities/${id}`).update(dataToSave);
-                    else await db.collection(`trips/${tripId}/activities`).add(dataToSave);
-                } catch(e) {
-                    console.warn("Échec de la sauvegarde Firestore du journal", e);
-                }
-                setIsJournalModalOpen(false);
-            };
-
-            const handleImageUpload = async (e, callback) => {
-                const files = Array.from(e.target.files);
-                if (!files.length) return;
-                const newPhotos = [];
-                for (const file of files) {
-                    const base64 = await new Promise((resolve) => {
-                        const reader = new FileReader();
-                        reader.onload = (event) => {
-                            const img = new window.Image();
-                            img.onload = () => {
-                                const canvas = document.createElement('canvas');
-                                const MAX_WIDTH = 800;
-                                let scaleSize = img.width > MAX_WIDTH ? MAX_WIDTH / img.width : 1;
-                                canvas.width = img.width * scaleSize; canvas.height = img.height * scaleSize;
-                                const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                                resolve(canvas.toDataURL('image/jpeg', 0.6));
-                            };
-                            img.src = event.target.result;
-                        };
-                        reader.readAsDataURL(file);
-                    });
-                    newPhotos.push(base64);
-                }
-                callback(newPhotos);
+                const data = { ...activityForm, country: activityForm.country || detectCountry(activityForm.address) || '' };
+                if (editingActivity) await db.doc(`trips/${tripId}/activities/${editingActivity.id}`).update(data);
+                else await db.collection(`trips/${tripId}/activities`).add(data);
+                setIsModalOpen(false);
             };
 
             const askGemini = async (prompt) => {
                 if(!geminiKey || !geminiModel) { setIsSettingsModalOpen(true); return null; }
                 try {
-                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`, {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-                    });
-                    const data = await response.json();
-                    if(data.error) throw new Error(data.error.message);
+                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`, { method: 'POST', body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
+                    const data = await res.json();
                     return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-                } catch (error) { alert("Erreur IA: " + error.message); return null; }
+                } catch (e) { return null; }
             };
 
             const handleSearchAi = async (e) => {
                 e.preventDefault();
                 if (!aiQuery) return;
                 setIsAiLoading(true); setAiSuggestion(null);
-                const prompt = `Trouve jusqu'à 3 correspondances possibles pour ce lieu : "${aiQuery}". Réponds UNIQUEMENT avec un tableau JSON (sans markdown) contenant des objets avec "name", "address", "country" (le nom du pays en français) et "duration" (estimation du temps moyen sur place, ex: "1h30", "2h", "45min"). Si le lieu est un restaurant ou dédié à un repas, indique au moins "1h00". Exemple: [{"name": "Lieu A", "address": "Adresse A", "country": "Japon", "duration": "2h"}]`;
-                const result = await askGemini(prompt);
-                if (result) {
-                    try {
-                        const suggestions = JSON.parse(result.replace(/```json/g, '').replace(/```/g, '').trim());
-                        if (Array.isArray(suggestions)) setAiSuggestion(suggestions);
-                        else if (suggestions.name && suggestions.address) setAiSuggestion([suggestions]);
-                    } catch (e) { console.error("Erreur parsing JSON IA :", e); }
+                const res = await askGemini(`Trouve jusqu'à 3 lieux pour : "${aiQuery}". Réponds UNIQUEMENT en JSON: [{"name": "Nom", "address": "Adresse complète", "country": "Pays", "duration": "1h30"}]. Restaurant = duration min 1h.`);
+                if (res) {
+                    try { setAiSuggestion(JSON.parse(res.replace(/```json|```/g, '').trim())); } catch(e) {}
                 }
                 setIsAiLoading(false);
             };
 
-            const handleSearchHotelAi = async (e) => {
-                if (e) e.preventDefault();
-                if (!aiHotelQuery) return;
-                setIsHotelAiLoading(true);
-                setAiHotelSuggestion(null);
-                const prompt = `Trouve jusqu'à 3 adresses exactes possibles pour cet hôtel ou hébergement : "${aiHotelQuery}". Réponds UNIQUEMENT avec un tableau JSON (sans markdown) contenant des objets avec "name" et "address". Exemple: [{"name": "Hôtel A", "address": "Adresse A"}]`;
-                const result = await askGemini(prompt);
-                if (result) {
-                    try {
-                        const suggestions = JSON.parse(result.replace(/```json/g, '').replace(/```/g, '').trim());
-                        if (Array.isArray(suggestions)) setAiHotelSuggestion(suggestions);
-                        else if (suggestions.name && suggestions.address) setAiHotelSuggestion([suggestions]);
-                    } catch (e) { console.error("Erreur parsing JSON Hôtel IA :", e); }
-                }
-                setIsHotelAiLoading(false);
-            };
-
-            const handleRewriteJournalAi = async (currentNotes, setNotesCallback) => {
-                if (!currentNotes) return;
-                setIsAiRewriting(true);
-                const result = await askGemini(`Agis comme un écrivain de voyage. Réécris ce brouillon de manière poétique, vivante et bien formulée en français. Ne renvoie que le texte. Brouillon : "${currentNotes}"`);
-                if (result) setNotesCallback(result.trim());
-                setIsAiRewriting(false);
-            };
-
-            const handleYoutubeSearch = () => {
-                if (!ytSearchQuery) return;
-                window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(ytSearchQuery)}`, '_blank');
-            };
-
-            const handleSaveYoutubeLink = async () => {
-                if (!user || !ytLinkInput) return;
-                try {
-                    const activitiesRef = db.collection(`trips/${tripId}/activities`);
-                    await activitiesRef.add({
-                        name: 'Vidéo YouTube à définir',
-                        address: 'À définir',
-                        country: '',
-                        type: 'visite',
-                        time: '10:00',
-                        dayId: '',
-                        period: 'morning',
-                        url: ytLinkInput,
-                        notes: '',
-                        photos: []
-                    });
-                } catch(e) {
-                     console.warn("Échec de la sauvegarde Firestore du lien", e);
-                }
-                setYtLinkInput('');
-                setYtSearchQuery('');
-            };
-
-            const getTransitLinkFromHotel = (destination, dayId) => {
-                const origin = settings.days.find(d => d.id === dayId)?.hotelAddress;
-                if (!origin || !destination || destination === 'À définir') return '#';
-                return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&travelmode=transit`;
-            };
-
-            const getTransitLinkFromCurrent = (destination) => (!destination || destination === 'À définir') ? '#' : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=transit`;
-
-            const openActivityModal = (activity = null) => {
-                if (activity) {
-                    setEditingActivity(activity);
-                    setActivityForm({ name: activity.name, type: activity.type, address: activity.address, country: activity.country || '', duration: activity.duration || '', time: activity.time || '10:00', period: activity.period || 'morning', dayId: activity.dayId || '', url: activity.url || '', photos: activity.photos || [], notes: activity.notes || '' });
-                } else {
-                    setEditingActivity(null);
-                    setActivityForm({ name: '', type: 'visite', address: '', country: '', duration: '', time: '10:00', period: 'morning', dayId: activeTab === 'planner' ? activeDayId : '', url: '', photos: [], notes: '' });
-                }
-                setIsModalOpen(true);
-            };
-
-            const openSpontaneousJournalModal = () => {
-                const now = new Date();
-                setEditingActivity({
-                    id: null, name: '', address: '', country: '', dayId: settings.days.find(d => d.id === activeDayId)?.id || settings.days[0]?.id || '',
-                    time: `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`, notes: '', photos: [], type: 'visite', url: ''
+            const handleAutoFill = async () => {
+                setIsUpdatingData(true);
+                const batch = db.batch();
+                let count = 0;
+                activities.forEach(act => {
+                    let upd = {};
+                    if (!act.duration) upd.duration = act.type === 'restaurant' ? '1h30' : '2h00';
+                    if (!act.country && act.address) { const c = detectCountry(act.address); if (c) upd.country = c; }
+                    if (Object.keys(upd).length > 0) { batch.update(db.doc(`trips/${tripId}/activities/${act.id}`), upd); count++; }
                 });
-                setIsJournalModalOpen(true);
-            };
-
-            const closeActivityModal = () => { setIsModalOpen(false); setEditingActivity(null); setAiSuggestion(null); setAiQuery(''); };
-
-            const toggleExpand = (id) => {
-                const newSet = new Set(expandedIds);
-                if (newSet.has(id)) newSet.delete(id);
-                else newSet.add(id);
-                setExpandedIds(newSet);
+                if (count > 0) { await batch.commit(); setUpdateMessage(`${count} lieu(x) mis à jour !`); }
+                else setUpdateMessage("Déjà à jour.");
+                setIsUpdatingData(false); setTimeout(() => setUpdateMessage(''), 3000);
             };
 
             if (isInitializing) return <div className="min-h-screen flex items-center justify-center text-sm text-zinc-500">Chargement...</div>;
 
-            // Retiré authError screen bloquant, l'app fonctionnera en cache hors ligne si possible.
-
-            // Tri et Filtrage
-            const backlogActivities = activities.filter(a => !a.dayId);
-            
-            // Regroupement par pays pour le backlog (avec détection automatique à la volée)
-            const backlogByCountry = backlogActivities.reduce((acc, act) => {
-                let country = act.country && act.country.trim() !== '' ? act.country.trim() : null;
-                
-                // Si l'ancienne activité n'a pas de pays, on le devine via son adresse
-                if (!country && act.address) {
-                    country = detectCountry(act.address);
-                }
-                
-                country = country || 'Autres destinations';
-                
-                if (!acc[country]) acc[country] = [];
-                acc[country].push(act);
-                return acc;
-            }, {});
-            
-            const sortedCountries = Object.keys(backlogByCountry).sort((a, b) => {
-                if (a === 'Autres destinations') return 1;
-                if (b === 'Autres destinations') return -1;
-                return a.localeCompare(b);
-            });
-            
-            // Pour le planning, on groupe par "Moment" (period)
-            const plannedActivitiesByPeriod = {};
-            PERIODS.forEach(p => plannedActivitiesByPeriod[p.id] = []);
-            
-            activities.filter(a => a.dayId === activeDayId)
-                      .sort((a, b) => (a.time || '').localeCompare(b.time || ''))
-                      .forEach(act => {
-                          const p = act.period || 'morning';
-                          if (plannedActivitiesByPeriod[p]) plannedActivitiesByPeriod[p].push(act);
-                          else plannedActivitiesByPeriod['morning'].push(act);
-                      });
-
-            const journalActivities = activities.filter(a => a.dayId && (journalFilter === 'all' || a.dayId === journalFilter)).sort((a, b) => {
-                const dA = settings.days.findIndex(d => d.id === a.dayId), dB = settings.days.findIndex(d => d.id === b.dayId);
-                if (dA !== dB) return dA - dB;
-                return (a.time || '').localeCompare(b.time || '');
-            });
-
-            // Rendu d'une carte d'activité compacte (Accordéon)
-            const renderCompactActivityCard = (activity, isPlanner = false, showTime = true, showCountry = true) => {
-                const isExpanded = expandedIds.has(activity.id);
-                const borderColor = activity.type === 'restaurant' ? 'border-l-orange-400' : 'border-l-blue-400';
-                
-                // On affiche le pays même s'il vient juste d'être deviné
-                let displayCountry = activity.country;
-                if (!displayCountry && activity.address) {
-                    displayCountry = detectCountry(activity.address);
-                }
-                
-                return (
-                    <div key={activity.id} className={`bg-white border border-zinc-200 rounded-xl shadow-sm overflow-hidden border-l-4 ${borderColor}`}>
-                        {/* En-tête cliquable */}
-                        <div onClick={() => toggleExpand(activity.id)} className="flex justify-between items-center p-3 cursor-pointer hover:bg-zinc-50 transition-colors">
-                            <div className="flex items-center gap-3 overflow-hidden pr-2">
-                                {showTime && activity.time && <span className="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2 py-1 rounded-md flex-shrink-0">{activity.time}</span>}
-                                <div className="flex flex-col truncate">
-                                    <h4 className="font-semibold text-zinc-900 truncate">{activity.name}</h4>
-                                    {/* Etiquette PAYS */}
-                                    {showCountry && displayCountry && (
-                                        <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mt-0.5 flex items-center gap-1">
-                                            <Icon name="globe" size={10} /> {displayCountry}
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="text-zinc-400 flex-shrink-0">
-                                <Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} />
-                            </div>
-                        </div>
-
-                        {/* Corps dépliant */}
-                        {isExpanded && (
-                            <div className="p-3 border-t border-zinc-100 bg-zinc-50/50 animate-in fade-in duration-200">
-                                <p className="text-sm text-zinc-500 flex items-start gap-1.5 leading-snug">
-                                    <Icon name="pin" size={14} className={`mt-0.5 flex-shrink-0 ${activity.type === 'restaurant' ? 'text-orange-500' : 'text-blue-500'}`} />
-                                    {activity.address}
-                                </p>
-
-                                {activity.duration && (
-                                    <p className="text-xs text-zinc-600 flex items-center gap-1.5 mt-2 font-medium bg-zinc-200/50 inline-flex px-2 py-1 rounded-md">
-                                        <Icon name="clock" size={12} /> Durée est. : {activity.duration}
-                                    </p>
-                                )}
-                                
-                                {activity.url && (
-                                    <a href={activity.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors bg-indigo-100/50 px-2 py-1 rounded-md border border-indigo-100">
-                                        <Icon name={activity.url.includes('youtube.com') || activity.url.includes('youtu.be') ? 'youtube' : 'link'} size={12} />
-                                        Ouvrir le lien
-                                    </a>
-                                )}
-                                
-                                {activity.notes && (
-                                    <p className="text-xs text-zinc-600 mt-2.5 italic border-l-2 border-indigo-200 pl-2 leading-relaxed">
-                                        "{activity.notes}"
-                                    </p>
-                                )}
-                                
-                                {activity.photos && activity.photos.length > 0 && (
-                                    <div className="flex gap-2 overflow-x-auto mt-2.5 pb-1 scrollbar-hide">
-                                        {activity.photos.map((p, i) => (
-                                            <img key={i} src={p} className="w-16 h-16 rounded-md object-cover flex-shrink-0 border border-zinc-200 shadow-sm" alt="Inspiration" />
-                                        ))}
-                                    </div>
-                                )}
-
-                                {/* Boutons d'action */}
-                                <div className="flex flex-wrap gap-2 pt-3 mt-3 border-t border-zinc-200/60">
-                                    <button onClick={() => openActivityModal(activity)} className="flex-1 flex justify-center items-center gap-1.5 text-xs font-medium text-zinc-600 bg-white border border-zinc-200 py-2 rounded-lg hover:bg-zinc-100 transition-colors">
-                                        <Icon name="edit" size={14} /> Modifier
-                                    </button>
-                                    
-                                    {isPlanner ? (
-                                        <>
-                                            <button onClick={() => assignActivityToDay(activity, '')} className="flex-1 flex justify-center items-center gap-1.5 text-xs font-medium text-zinc-600 bg-white border border-zinc-200 py-2 rounded-lg hover:bg-zinc-100 transition-colors">
-                                                <Icon name="list" size={14} /> Retirer
-                                            </button>
-                                            <a href={getTransitLinkFromCurrent(activity.address)} target="_blank" className={`w-full sm:flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-white bg-indigo-600 py-2 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm ${activity.address === 'À définir' ? 'opacity-50 pointer-events-none' : ''}`}>
-                                                <Icon name="navigation" size={14} /> S'y rendre
-                                            </a>
-                                        </>
-                                    ) : (
-                                        <button onClick={() => deleteActivity(activity.id)} className="flex-1 flex justify-center items-center gap-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-100 py-2 rounded-lg hover:bg-red-100 transition-colors">
-                                            <Icon name="trash" size={14} /> Supprimer
-                                        </button>
-                                    )}
-
-                                    {/* Menu déroulant rapide pour "À faire" */}
-                                    {!isPlanner && (
-                                        <select className="w-full bg-white text-zinc-700 text-xs font-medium p-2 rounded-lg border border-zinc-200 focus:outline-none focus:border-indigo-400" value="" onChange={(e) => assignActivityToDay(activity, e.target.value)}>
-                                            <option value="" disabled>Planifier ce lieu...</option>
-                                            {settings.days.map(d => <option key={d.id} value={d.id}>{getDayDisplayName(d.id)}</option>)}
-                                        </select>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                );
-            };
-
             return (
                 <div className="min-h-screen flex justify-center bg-zinc-100">
-                    <div className="w-full max-w-md bg-white min-h-screen relative shadow-sm overflow-x-hidden flex flex-col pb-24">
+                    <div className="w-full max-w-md bg-white min-h-screen relative shadow-sm flex flex-col pb-24">
                         
-                        {/* HEADER */}
                         <header className="bg-white border-b border-zinc-200 p-5 sticky top-0 z-20 flex justify-between items-center">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 bg-indigo-50 rounded-xl">
-                                    <Icon name="map" size={20} className="text-indigo-600" />
-                                </div>
-                                <div>
-                                    <h1 className="text-lg font-bold text-zinc-900 tracking-tight">Mon Voyage</h1>
-                                </div>
+                                <div className="p-2 bg-indigo-50 rounded-xl"><Icon name="map" size={20} className="text-indigo-600" /></div>
+                                <div><h1 className="text-lg font-bold text-zinc-900 tracking-tight">Mon Voyage</h1></div>
                             </div>
-                            <button onClick={() => setIsSettingsModalOpen(true)} className="p-2 text-zinc-400 hover:text-zinc-900 transition-colors relative">
+                            <button onClick={() => setIsSettingsModalOpen(true)} className="p-2 text-zinc-400 hover:text-zinc-900 relative">
                                 <Icon name="settings" size={22} />
-                                {geminiModel ? (
-                                    <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white"></span>
-                                ) : (
-                                    <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
-                                )}
+                                <span className={`absolute top-2 right-2 w-2.5 h-2.5 rounded-full border-2 border-white ${geminiModel ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
                             </button>
                         </header>
 
-                        <main className="flex-grow p-4 space-y-6">
-                            
-                            {/* VUE BACKLOG */}
+                        <main className="flex-grow p-4 space-y-6 overflow-x-hidden">
+                            {/* CARTE */}
+                            {activeTab === 'map' && (
+                                <section className="animate-in fade-in duration-200 flex flex-col h-[calc(100vh-200px)]">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h2 className="text-sm font-semibold text-zinc-800 uppercase tracking-wide">Carte globale</h2>
+                                        <select value={mapCountryFilter} onChange={(e) => setMapCountryFilter(e.target.value)} className="bg-white border border-zinc-200 text-zinc-700 text-xs py-1.5 px-3 rounded-lg outline-none">
+                                            <option value="all">Tous les pays</option>
+                                            {sortedCountries.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="flex-grow bg-zinc-200 rounded-xl overflow-hidden shadow-inner border border-zinc-300">
+                                        <MapComponent activities={activities} countryFilter={mapCountryFilter} />
+                                    </div>
+                                </section>
+                            )}
+
+                            {/* BACKLOG */}
                             {activeTab === 'backlog' && (
                                 <section className="space-y-5 animate-in fade-in duration-200">
                                     <h2 className="text-sm font-semibold text-zinc-800 uppercase tracking-wide">À faire (Idées)</h2>
-
-                                    {backlogActivities.length === 0 ? (
-                                        <div className="text-center p-10 border border-dashed border-zinc-200 rounded-xl">
-                                            <p className="text-zinc-400 text-sm">Votre liste est vide.</p>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-8">
-                                            {sortedCountries.map(country => (
-                                                <div key={country} className="space-y-3">
-                                                    <div className="flex items-center gap-3 mb-4">
-                                                        <span className="flex items-center justify-center w-8 h-8 bg-indigo-100 text-indigo-700 rounded-full shadow-sm flex-shrink-0">
-                                                            <Icon name="globe" size={16} />
-                                                        </span>
-                                                        <h3 className="text-sm font-bold text-zinc-800 uppercase tracking-wider">
-                                                            {country}
-                                                        </h3>
-                                                    </div>
-                                                    
-                                                    {country === 'Autres destinations' && (
-                                                        <div className="pl-11 -mt-2 mb-3">
-                                                            <p className="text-xs text-orange-600 bg-orange-50 border border-orange-100 p-2 rounded-lg italic">
-                                                                💡 Adresses non reconnues. Cliquez sur "Modifier" (✏️) pour indiquer le pays.
-                                                            </p>
-                                                        </div>
-                                                    )}
-
-                                                    <div className="space-y-3 pl-4 border-l-2 border-indigo-100 ml-4">
-                                                        {/* On affiche la carte sans l'heure (false) et sans répéter le pays (false) car on est déjà dans la catégorie du pays */}
-                                                        {backlogByCountry[country].map(activity => renderCompactActivityCard(activity, false, false, false))}
-                                                    </div>
+                                    <div className="space-y-8">
+                                        {sortedCountries.map(country => (
+                                            <div key={country} className="space-y-3">
+                                                <div className="flex items-center gap-3 mb-4">
+                                                    <span className="flex items-center justify-center w-8 h-8 bg-indigo-100 text-indigo-700 rounded-full"><Icon name="globe" size={16} /></span>
+                                                    <h3 className="text-sm font-bold text-zinc-800 uppercase tracking-wider">{country}</h3>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </section>
-                            )}
-
-                            {/* VUE PLANNER */}
-                            {activeTab === 'planner' && (
-                                <section className="animate-in fade-in duration-200 space-y-5">
-                                    {/* Jours */}
-                                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide items-center">
-                                        {settings.days.map(day => (
-                                            <button key={day.id} onClick={() => setActiveDayId(day.id)} className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors border ${activeDayId === day.id ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-zinc-600 hover:bg-zinc-50 border-zinc-200'}`}>
-                                                {getDayDisplayName(day.id)}
-                                            </button>
-                                        ))}
-                                        <button onClick={handleAddDay} className="flex-shrink-0 p-2 rounded-full bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors">
-                                            <Icon name="plus" size={18} />
-                                        </button>
-                                    </div>
-
-                                    {/* Hôtel (Teinte Orange/Ambre) */}
-                                    <div className="bg-orange-50/50 border border-orange-200/60 rounded-xl p-4">
-                                        <label className="text-xs font-semibold text-orange-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                                            <Icon name="hotel" size={14} className="text-orange-500" /> Hébergement - {getDayDisplayName(activeDayId)}
-                                        </label>
-                                        
-                                        <div className="mb-3">
-                                            <div className="flex gap-2">
-                                                <input type="text" placeholder="Rechercher avec l'IA (ex: The Venetian...)" value={aiHotelQuery} onChange={(e) => setAiHotelQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearchHotelAi(e)} className="flex-1 px-3 py-2 text-sm bg-white border border-orange-200 rounded-lg focus:outline-none focus:border-orange-400" />
-                                                <button onClick={handleSearchHotelAi} disabled={isHotelAiLoading || !aiHotelQuery} className="bg-orange-500 text-white px-3.5 rounded-lg disabled:opacity-50 flex items-center justify-center hover:bg-orange-600 transition-colors shadow-sm">
-                                                    {isHotelAiLoading ? <Icon name="loader" size={16} className="animate-spin" /> : <Icon name="sparkles" size={16} />}
-                                                </button>
-                                            </div>
-                                            {aiHotelSuggestion && aiHotelSuggestion.length > 0 && (
-                                                <div className="mt-2 space-y-2 max-h-48 overflow-y-auto scrollbar-hide animate-in fade-in duration-200">
-                                                    <p className="text-[10px] uppercase font-bold text-orange-400 pl-1">Propositions :</p>
-                                                    {aiHotelSuggestion.map((sugg, idx) => (
-                                                        <div key={idx} className="p-3 bg-white border border-orange-100 rounded-lg text-sm shadow-sm">
-                                                            <p className="font-semibold text-zinc-900">{sugg.name}</p>
-                                                            <p className="text-xs text-zinc-500 mb-2 mt-0.5">{sugg.address}</p>
-                                                            <button onClick={() => { updateDayHotel(`${sugg.name}, ${sugg.address}`); setAiHotelSuggestion(null); setAiHotelQuery(''); }} className="w-full bg-orange-50 text-orange-700 font-medium py-1.5 rounded hover:bg-orange-100 transition-colors">
-                                                                Sélectionner
-                                                            </button>
-                                                        </div>
+                                                <div className="space-y-3 pl-4 border-l-2 border-indigo-100 ml-4">
+                                                    {backlogByCountry[country].map(activity => (
+                                                        <ActivityCard key={activity.id} activity={activity} isPlanner={false} showTime={false} showCountry={false} isExpanded={expandedIds.has(activity.id)} onToggle={toggleExpand} onEdit={openActivityModal} onDelete={deleteActivity} onAssign={assignActivityToDay} getDayDisplayName={getDayDisplayName} days={settings.days} />
                                                     ))}
                                                 </div>
-                                            )}
-                                        </div>
-
-                                        <input type="text" value={settings.days.find(d => d.id === activeDayId)?.hotelAddress || ''} onChange={(e) => updateDayHotel(e.target.value)} placeholder="Adresse exacte de votre hôtel" className="w-full px-3 py-2 text-sm bg-white border border-orange-200 rounded-lg focus:outline-none focus:border-orange-400" />
-                                    </div>
-
-                                    {/* Itinéraire par Sections (Moments de la journée) */}
-                                    <div className="space-y-6 pt-2">
-                                        {Object.values(plannedActivitiesByPeriod).flat().length === 0 ? (
-                                            <div className="text-center p-10 border border-dashed border-zinc-200 rounded-xl"><p className="text-zinc-400 text-sm">Rien de prévu pour ce jour.</p></div>
-                                        ) : (
-                                            PERIODS.map(period => {
-                                                const acts = plannedActivitiesByPeriod[period.id];
-                                                if (!acts || acts.length === 0) return null;
-                                                return (
-                                                    <div key={period.id} className="space-y-3">
-                                                        <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-2 pl-2">
-                                                            <span className="text-base">{period.icon}</span> {period.label}
-                                                        </h3>
-                                                        <div className="space-y-3 relative border-l border-zinc-200 ml-4 pl-4">
-                                                            {acts.map(activity => renderCompactActivityCard(activity, true))}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })
-                                        )}
+                                            </div>
+                                        ))}
                                     </div>
                                 </section>
                             )}
 
-                            {/* VUE JOURNAL (Teinte Émeraude/Teal) */}
-                            {activeTab === 'journal' && (
-                                <section className="space-y-6 animate-in fade-in duration-200">
-                                    <div className="bg-teal-50/50 p-4 rounded-xl border border-teal-100 flex items-start gap-3">
-                                        <div className="text-teal-600 mt-0.5"><Icon name="book" size={24} /></div>
-                                        <div>
-                                            <h2 className="font-bold text-teal-900 text-sm">Mon Carnet</h2>
-                                            <p className="text-xs text-teal-700 mt-1 leading-relaxed opacity-90">Documentez votre voyage avec des photos. L'IA peut reformuler vos notes.</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Filtre par jours pour le journal */}
-                                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide items-center mb-4">
-                                        <button 
-                                            onClick={() => setJournalFilter('all')} 
-                                            className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors border ${journalFilter === 'all' ? 'bg-teal-600 text-white border-teal-600 shadow-md' : 'bg-white text-zinc-600 hover:bg-zinc-50 border-zinc-200'}`}
-                                        >
-                                            Tous
-                                        </button>
+                            {/* PLANNER */}
+                            {activeTab === 'planner' && (
+                                <section className="animate-in fade-in duration-200 space-y-5">
+                                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide items-center">
                                         {settings.days.map(day => (
-                                            <button 
-                                                key={day.id} 
-                                                onClick={() => setJournalFilter(day.id)} 
-                                                className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors border ${journalFilter === day.id ? 'bg-teal-600 text-white border-teal-600 shadow-md' : 'bg-white text-zinc-600 hover:bg-zinc-50 border-zinc-200'}`}
-                                            >
+                                            <button key={day.id} onClick={() => setActiveDayId(day.id)} className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium border ${activeDayId === day.id ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-zinc-600 border-zinc-200'}`}>
                                                 {getDayDisplayName(day.id)}
                                             </button>
                                         ))}
+                                        <button onClick={handleAddDay} className="flex-shrink-0 p-2 rounded-full bg-indigo-50 text-indigo-600"><Icon name="plus" size={18} /></button>
                                     </div>
-                                    
-                                    <div className="space-y-5">
-                                        {journalActivities.map(activity => {
-                                            const photos = activity.photos || (activity.photoBase64 ? [activity.photoBase64] : []);
-                                            return (
-                                                <div key={activity.id} className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
-                                                    {photos.length > 0 ? (
-                                                        <div className="relative w-full h-48 flex snap-x overflow-x-auto scrollbar-hide bg-zinc-100 border-b border-zinc-100">
-                                                            {photos.map((p, i) => (
-                                                                <div key={i} className="w-full h-full flex-shrink-0 snap-center relative">
-                                                                    <img src={p} className="w-full h-full object-cover" />
-                                                                    {photos.length > 1 && <div className="absolute bottom-2 right-2 bg-zinc-900/70 text-white text-[10px] font-medium px-2 py-0.5 rounded-md backdrop-blur-sm">{i + 1}/{photos.length}</div>}
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    ) : null}
-                                                    
-                                                    <div className="p-4">
-                                                        <div className="flex justify-between items-start mb-2">
-                                                            <div>
-                                                                <h3 className="font-semibold text-zinc-900">{activity.name}</h3>
-                                                                <p className="text-xs text-zinc-500 mt-0.5">{getDayDisplayName(activity.dayId)} • {activity.time}</p>
-                                                            </div>
-                                                            <button onClick={() => { setEditingActivity(activity); setIsJournalModalOpen(true); }} className="p-2 text-teal-600 hover:text-teal-800 bg-teal-50 rounded-full transition-colors flex-shrink-0">
-                                                                <Icon name="edit" size={16} />
-                                                            </button>
-                                                        </div>
-                                                        {activity.notes ? (
-                                                            <p className="text-sm text-zinc-700 mt-3 whitespace-pre-wrap leading-relaxed border-l-2 border-teal-200 pl-3 italic">"{activity.notes}"</p>
-                                                        ) : (
-                                                            <p className="text-sm text-zinc-400 mt-2 italic">Ajouter des notes...</p>
-                                                        )}
-                                                    </div>
+                                    <div className="bg-orange-50/50 border border-orange-200/60 rounded-xl p-4">
+                                        <label className="text-xs font-semibold text-orange-800 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Icon name="hotel" size={14} className="text-orange-500" /> Hébergement</label>
+                                        <input type="text" value={settings.days.find(d => d.id === activeDayId)?.hotelAddress || ''} onChange={(e) => updateDayHotel(e.target.value)} placeholder="Adresse de l'hôtel" className="w-full px-3 py-2 text-sm bg-white border border-orange-200 rounded-lg outline-none focus:border-orange-400" />
+                                    </div>
+                                    <div className="space-y-6 pt-2">
+                                        {PERIODS.map(period => plannedActivitiesByPeriod[period.id]?.length > 0 && (
+                                            <div key={period.id} className="space-y-3">
+                                                <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-2 pl-2"><span className="text-base">{period.icon}</span> {period.label}</h3>
+                                                <div className="space-y-3 pl-4 border-l border-zinc-200 ml-4">
+                                                    {plannedActivitiesByPeriod[period.id].map(activity => (
+                                                        <ActivityCard key={activity.id} activity={activity} isPlanner={true} showTime={true} showCountry={true} isExpanded={expandedIds.has(activity.id)} onToggle={toggleExpand} onEdit={openActivityModal} onDelete={deleteActivity} onAssign={assignActivityToDay} getDayDisplayName={getDayDisplayName} days={settings.days} />
+                                                    ))}
                                                 </div>
-                                            );
-                                        })}
-                                        {journalActivities.length === 0 && <p className="text-center text-zinc-400 text-sm py-10">Aucun souvenir enregistré pour cette sélection.</p>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
+
+                            {/* JOURNAL */}
+                            {activeTab === 'journal' && (
+                                <section className="space-y-5 animate-in fade-in duration-200">
+                                    <div className="bg-teal-50/50 p-4 rounded-xl border border-teal-100 flex items-start gap-3">
+                                        <div className="text-teal-600 mt-0.5"><Icon name="book" size={24} /></div>
+                                        <div><h2 className="font-bold text-teal-900 text-sm">Mon Carnet</h2><p className="text-xs text-teal-700 mt-1 opacity-90">Documentez vos souvenirs.</p></div>
+                                    </div>
+                                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide items-center mb-4">
+                                        <button onClick={() => setJournalFilter('all')} className={`px-4 py-2 rounded-full text-sm font-medium border ${journalFilter === 'all' ? 'bg-teal-600 text-white' : 'bg-white text-zinc-600'}`}>Tous</button>
+                                        {settings.days.map(day => <button key={day.id} onClick={() => setJournalFilter(day.id)} className={`px-4 py-2 rounded-full text-sm font-medium border ${journalFilter === day.id ? 'bg-teal-600 text-white' : 'bg-white text-zinc-600'}`}>{getDayDisplayName(day.id)}</button>)}
+                                    </div>
+                                    <div className="space-y-5">
+                                        {journalActivities.map(activity => (
+                                            <div key={activity.id} className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
+                                                {activity.photos?.length > 0 && (
+                                                    <div className="relative w-full h-48 flex snap-x overflow-x-auto scrollbar-hide bg-zinc-100">
+                                                        {activity.photos.map((p, i) => <div key={i} className="w-full h-full flex-shrink-0 snap-center relative"><img src={p} className="w-full h-full object-cover" /></div>)}
+                                                    </div>
+                                                )}
+                                                <div className="p-4">
+                                                    <div className="flex justify-between">
+                                                        <div><h3 className="font-semibold text-zinc-900">{activity.name}</h3><p className="text-xs text-zinc-500">{getDayDisplayName(activity.dayId)}</p></div>
+                                                        <button onClick={() => { setEditingActivity(activity); setIsJournalModalOpen(true); }} className="p-2 text-teal-600 bg-teal-50 rounded-full"><Icon name="edit" size={16} /></button>
+                                                    </div>
+                                                    <p className="text-sm text-zinc-700 mt-3 whitespace-pre-wrap italic border-l-2 border-teal-200 pl-3">{activity.notes || "Ajouter des notes..."}</p>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
                                 </section>
                             )}
                         </main>
 
-                        {/* NAV BOTTOM */}
                         <nav className="fixed bottom-0 w-full max-w-md bg-white border-t border-zinc-200 flex justify-around p-2 pb-6 z-30">
-                            {[
-                                { id: 'backlog', icon: 'list', label: 'À faire' },
-                                { id: 'planner', icon: 'calendar', label: 'Planning' },
-                                { id: 'journal', icon: 'book', label: 'Journal' }
-                            ].map(tab => (
-                                <button 
-                                    key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)} 
-                                    className={`flex flex-col items-center p-2 flex-1 relative ${activeTab === tab.id ? 'text-indigo-600' : 'text-zinc-400 hover:text-zinc-600'}`}
-                                >
-                                    <Icon name={tab.icon} size={22} className="mb-1.5" />
-                                    <span className={`text-[10px] uppercase tracking-wider ${activeTab === tab.id ? 'font-bold' : 'font-medium'}`}>{tab.label}</span>
-                                    {activeTab === tab.id && <div className="absolute top-0 w-8 h-0.5 bg-indigo-600 rounded-b-full"></div>}
+                            {[{ id: 'backlog', icon: 'list', label: 'À faire' }, { id: 'map', icon: 'map-pin', label: 'Carte' }, { id: 'planner', icon: 'calendar', label: 'Planning' }, { id: 'journal', icon: 'book', label: 'Journal' }].map(tab => (
+                                <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center p-2 flex-1 relative ${activeTab === tab.id ? 'text-indigo-600' : 'text-zinc-400'}`}>
+                                    <Icon name={tab.icon} size={22} className="mb-1.5" /><span className={`text-[10px] uppercase ${activeTab === tab.id ? 'font-bold' : 'font-medium'}`}>{tab.label}</span>
                                 </button>
                             ))}
                         </nav>
 
-                        {/* FAB */}
-                        <button onClick={() => activeTab === 'journal' ? openSpontaneousJournalModal() : openActivityModal()} className={`absolute bottom-24 right-5 w-10 h-10 text-white rounded-full shadow-md z-30 transition-colors flex items-center justify-center ${activeTab === 'journal' ? 'bg-teal-600 hover:bg-teal-700' : 'bg-zinc-900 hover:bg-zinc-800'}`}>
-                            <Icon name={activeTab === 'journal' ? 'camera' : 'plus'} size={18} />
+                        <button onClick={() => activeTab === 'journal' ? openSpontaneousJournalModal() : openActivityModal()} className={`absolute bottom-24 right-5 w-10 h-10 text-white rounded-full shadow-md z-30 flex items-center justify-center ${activeTab === 'journal' ? 'bg-teal-600' : 'bg-zinc-900'}`}>
+                            <Icon name="plus" size={18} />
                         </button>
 
-                        {/* =========================================
-                            MODALE PARAMÈTRES ET IA
-                        ========================================= */}
+                        {/* Modales (Allégées visuellement dans le code) */}
                         {isSettingsModalOpen && (
                             <div className="fixed inset-0 bg-zinc-900/40 backdrop-blur-sm z-50 flex flex-col justify-end">
-                                <div className="bg-white rounded-t-2xl shadow-xl w-full max-w-md mx-auto p-5 animate-in slide-in-from-bottom-4 duration-200 max-h-[90vh] overflow-y-auto">
-                                    <div className="flex justify-between items-center mb-6">
-                                        <h3 className="text-lg font-semibold text-zinc-900 flex items-center gap-2">
-                                            <Icon name="settings" size={20} className="text-indigo-600" /> Paramètres
-                                        </h3>
-                                        <button onClick={() => setIsSettingsModalOpen(false)} className="p-2 text-zinc-400 hover:text-zinc-900 bg-zinc-100 rounded-full"><Icon name="x" size={18} /></button>
+                                <div className="bg-white rounded-t-2xl shadow-xl w-full max-w-md mx-auto p-5 pb-10 space-y-6">
+                                    <div className="flex justify-between"><h3 className="font-semibold">Paramètres</h3><button onClick={() => setIsSettingsModalOpen(false)}><Icon name="x" /></button></div>
+                                    <div><label className="text-xs font-bold">Date de début</label><input type="date" value={settings.startDate} onChange={e => saveSettings({...settings, startDate: e.target.value})} className="w-full p-2 border rounded-lg mt-1" /></div>
+                                    <div>
+                                        <label className="text-xs font-bold">Clé IA Gemini</label><input type="password" value={tempKeyInput} onChange={e => setTempKeyInput(e.target.value)} placeholder="Clé..." className="w-full p-2 border rounded-lg mt-1" />
+                                        <button onClick={validateGeminiKey} className="w-full bg-indigo-600 text-white py-2 rounded-lg mt-2">Valider</button>
                                     </div>
-                                    
-                                    <div className="space-y-6">
-                                        {/* Paramètres Date */}
-                                        <div className="space-y-4 pb-6 border-b border-zinc-100">
-                                            <h4 className="text-sm font-bold text-zinc-800 flex items-center gap-1.5"><Icon name="calendar" size={16}/> Dates du voyage</h4>
-                                            <div>
-                                                <label className="block text-xs font-medium text-zinc-600 mb-1.5">Premier jour du voyage</label>
-                                                <input 
-                                                    type="date" 
-                                                    value={settings.startDate || ''} 
-                                                    onChange={(e) => saveSettings({...settings, startDate: e.target.value})} 
-                                                    className="w-full p-3 border border-zinc-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 bg-white" 
-                                                />
-                                                <p className="text-[10px] text-zinc-400 mt-1.5">Cela transformera "Jour 1" en la vraie date de votre voyage.</p>
-                                            </div>
-                                        </div>
-
-                                        {/* Paramètres IA */}
-                                        <div className="space-y-4">
-                                            <h4 className="text-sm font-bold text-zinc-800 flex items-center gap-1.5"><Icon name="sparkles" size={16}/> Agent IA Google</h4>
-                                            <div>
-                                                <div className="flex justify-between items-end mb-1.5">
-                                                    <label className="text-sm font-medium text-zinc-700">Clé API Google Gemini</label>
-                                                    <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-indigo-600 hover:text-indigo-800 underline text-xs font-medium">Obtenir une clé</a>
-                                                </div>
-                                                <input type="password" value={tempKeyInput} onChange={(e) => setTempKeyInput(e.target.value)} placeholder={geminiKey ? "••••••••••••••••" : "Collez la clé ici"} className="w-full p-3 border border-zinc-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500" />
-                                            </div>
-
-                                            <button onClick={validateGeminiKey} disabled={isKeyValidating || !tempKeyInput} className="w-full bg-indigo-600 text-white font-medium py-3 rounded-lg disabled:opacity-50 flex justify-center items-center gap-2 hover:bg-indigo-700 transition-colors">
-                                                {isKeyValidating ? <><Icon name="loader" size={16} className="animate-spin" /> Vérification...</> : 'Valider la clé IA'}
-                                            </button>
-
-                                            {geminiModel ? (
-                                                <div className="flex items-center gap-2 mt-2 p-3 bg-emerald-50 text-emerald-800 rounded-lg text-sm border border-emerald-100">
-                                                    <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full"></span> IA Connectée : <span className="font-medium">{geminiModel}</span>
-                                                </div>
-                                            ) : keyValidationError ? (
-                                                <div className="flex items-center gap-2 mt-2 p-3 bg-red-50 text-red-700 rounded-lg text-sm border border-red-100">
-                                                    <span className="w-2.5 h-2.5 bg-red-500 rounded-full"></span> {keyValidationError}
-                                                </div>
-                                            ) : null}
-                                        </div>
-
-                                        {/* Actions */}
-                                        <div className="pt-4 mt-2 space-y-3 border-t border-zinc-100">
-                                            <div>
-                                                <button onClick={handleAutoFillMissingData} disabled={isUpdatingData} className="w-full bg-indigo-50 text-indigo-700 border border-indigo-100 font-medium py-3 rounded-lg text-sm flex justify-center items-center gap-2 hover:bg-indigo-100 transition-colors disabled:opacity-50">
-                                                    {isUpdatingData ? <Icon name="loader" size={16} className="animate-spin" /> : <Icon name="sparkles" size={16} />} 
-                                                    Auto-compléter les anciennes activités (Durée/Pays)
-                                                </button>
-                                                {updateMessage && <p className="text-xs text-center text-indigo-600 mt-2 font-medium">{updateMessage}</p>}
-                                            </div>
-
-                                            <button onClick={handleExportJson} className="w-full bg-white border border-zinc-300 text-zinc-700 font-medium py-3 rounded-lg text-sm flex justify-center items-center gap-2 hover:bg-zinc-50 transition-colors">
-                                                <Icon name="download" size={16} /> Exporter les données (Sauvegarde)
-                                            </button>
-                                        </div>
-                                    </div>
+                                    <button onClick={handleAutoFill} disabled={isUpdatingData} className="w-full bg-indigo-50 text-indigo-700 py-3 rounded-lg font-medium">{isUpdatingData ? 'Mise à jour...' : 'Auto-compléter (Durées/Pays)'}</button>
+                                    <button onClick={() => {}} className="w-full bg-zinc-100 py-3 rounded-lg text-sm">Sauvegarder JSON</button>
                                 </div>
                             </div>
                         )}
 
-                        {/* Modal Edition Activité */}
                         {isModalOpen && (
                             <div className="fixed inset-0 bg-zinc-900/40 backdrop-blur-sm z-40 flex flex-col justify-end">
-                                <div className="bg-white rounded-t-2xl shadow-xl w-full max-w-md mx-auto max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-4 duration-200">
-                                    <div className="sticky top-0 bg-white border-b border-zinc-100 px-5 py-4 flex justify-between items-center z-10">
-                                        <h3 className="text-lg font-semibold text-zinc-900">{editingActivity ? 'Modifier' : 'Nouvelle étape'}</h3>
-                                        <button onClick={closeActivityModal} className="p-2 text-zinc-400 hover:text-zinc-900 bg-zinc-100 rounded-full"><Icon name="x" size={18} /></button>
+                                <div className="bg-white rounded-t-2xl w-full max-w-md mx-auto h-[85vh] overflow-y-auto">
+                                    <div className="sticky top-0 bg-white border-b px-5 py-4 flex justify-between z-10"><h3 className="font-bold">Activité</h3><button onClick={() => setIsModalOpen(false)}><Icon name="x"/></button></div>
+                                    <div className="p-5 bg-indigo-50/50 flex gap-2">
+                                        <input value={aiQuery} onChange={e => setAiQuery(e.target.value)} placeholder="IA : Musée..." className="flex-1 p-2 rounded-lg border" />
+                                        <button onClick={handleSearchAi} className="bg-indigo-600 text-white px-3 rounded-lg"><Icon name="sparkles" size={16}/></button>
                                     </div>
-                                    {!editingActivity && (
-                                        <div className="p-5 border-b border-indigo-50 bg-indigo-50/50">
-                                            <div className="flex gap-2">
-                                                <input type="text" placeholder="Rechercher avec l'IA (ex: Musée...)" value={aiQuery} onChange={(e) => setAiQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearchAi(e)} className="flex-1 p-2.5 text-sm border border-indigo-200 rounded-lg focus:outline-none focus:border-indigo-400" />
-                                                <button onClick={handleSearchAi} className="bg-indigo-600 text-white px-3.5 rounded-lg flex items-center justify-center hover:bg-indigo-700 transition-colors">
-                                                    {isAiLoading ? <Icon name="loader" size={16} className="animate-spin" /> : <Icon name="sparkles" size={16} />}
-                                                </button>
-                                            </div>
-                                            {aiSuggestion && aiSuggestion.length > 0 && (
-                                                <div className="mt-3 space-y-2 max-h-52 overflow-y-auto scrollbar-hide">
-                                                    <p className="text-[10px] uppercase font-bold text-indigo-400 pl-1">Propositions de l'IA :</p>
-                                                    {aiSuggestion.map((sugg, idx) => (
-                                                        <div key={idx} className="p-3 bg-white border border-indigo-100 rounded-lg text-sm shadow-sm">
-                                                            <p className="font-semibold text-zinc-900">{sugg.name}</p>
-                                                            <p className="text-xs text-zinc-500 mb-2 mt-0.5">{sugg.address}</p>
-                                                            <button onClick={() => { 
-                                                                setActivityForm({ ...activityForm, name: sugg.name, address: sugg.address, country: sugg.country || '', duration: sugg.duration || (activityForm.type === 'restaurant' ? '1h30' : '') }); 
-                                                                setAiSuggestion(null); 
-                                                                setAiQuery(''); 
-                                                            }} className="w-full bg-indigo-50 text-indigo-700 font-medium py-1.5 rounded hover:bg-indigo-100 transition-colors">
-                                                                Sélectionner
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
+                                    {aiSuggestion && aiSuggestion.map((s, i) => (
+                                        <div key={i} className="m-5 p-3 bg-white border rounded-lg shadow-sm">
+                                            <b>{s.name}</b><p className="text-xs">{s.address}</p>
+                                            <button onClick={() => { setActivityForm({...activityForm, ...s}); setAiSuggestion(null); setAiQuery(''); }} className="w-full mt-2 bg-indigo-50 py-1 rounded">Choisir</button>
                                         </div>
-                                    )}
-                                    <form onSubmit={saveActivity} className="p-5 space-y-4 pb-10">
-                                        <div>
-                                            <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
-                                                <Icon name="image" size={14} /> Photos / Inspirations
-                                            </label>
-                                            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-                                                {activityForm.photos && activityForm.photos.map((p, idx) => (
-                                                    <div key={idx} className="relative flex-shrink-0 w-20 h-20 rounded-lg border border-zinc-200 overflow-hidden shadow-sm">
-                                                        <img src={p} className="w-full h-full object-cover" />
-                                                        <button type="button" onClick={() => setActivityForm({...activityForm, photos: activityForm.photos.filter((_, i) => i !== idx)})} className="absolute top-1 right-1 bg-zinc-900/70 text-white p-1 rounded-md hover:bg-red-500 transition-colors backdrop-blur-sm">
-                                                            <Icon name="x" size={12} />
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                                <label className="flex-shrink-0 w-20 h-20 rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 flex flex-col items-center justify-center cursor-pointer text-zinc-400 hover:text-indigo-600 hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
-                                                    <Icon name="camera" size={18} className="mb-0.5" />
-                                                    <span className="text-[9px] font-medium uppercase">Prendre</span>
-                                                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleImageUpload(e, (newPhotos) => setActivityForm({...activityForm, photos: [...(activityForm.photos || []), ...newPhotos]}))} />
-                                                </label>
-                                                <label className="flex-shrink-0 w-20 h-20 rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 flex flex-col items-center justify-center cursor-pointer text-zinc-400 hover:text-indigo-600 hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
-                                                    <Icon name="image" size={18} className="mb-0.5" />
-                                                    <span className="text-[9px] font-medium uppercase">Galerie</span>
-                                                    <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleImageUpload(e, (newPhotos) => setActivityForm({...activityForm, photos: [...(activityForm.photos || []), ...newPhotos]}))} />
-                                                </label>
-                                            </div>
+                                    ))}
+                                    <form onSubmit={saveActivity} className="p-5 space-y-4">
+                                        <input required value={activityForm.name} onChange={e=>setActivityForm({...activityForm, name: e.target.value})} placeholder="Nom" className="w-full p-2 border rounded-lg" />
+                                        <input required value={activityForm.address} onChange={e=>setActivityForm({...activityForm, address: e.target.value})} placeholder="Adresse" className="w-full p-2 border rounded-lg" />
+                                        <div className="flex gap-2">
+                                            <input value={activityForm.country} onChange={e=>setActivityForm({...activityForm, country: e.target.value})} placeholder="Pays" className="w-1/2 p-2 border rounded-lg" />
+                                            <input value={activityForm.duration} onChange={e=>setActivityForm({...activityForm, duration: e.target.value})} placeholder="Durée" className="w-1/2 p-2 border rounded-lg" />
                                         </div>
-
-                                        <div><label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1.5">Nom</label><input type="text" required value={activityForm.name} onChange={(e) => setActivityForm({...activityForm, name: e.target.value})} className="w-full p-2.5 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500" /></div>
-                                        <div><label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1.5">Adresse</label><input type="text" required value={activityForm.address} onChange={(e) => setActivityForm({...activityForm, address: e.target.value})} className="w-full p-2.5 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500" /></div>
-                                        
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1.5">Pays</label>
-                                                <input type="text" value={activityForm.country || ''} onChange={(e) => setActivityForm({...activityForm, country: e.target.value})} placeholder="Ex: Japon" className="w-full p-2.5 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500" />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1.5">Durée</label>
-                                                <input type="text" value={activityForm.duration || ''} onChange={(e) => setActivityForm({...activityForm, duration: e.target.value})} placeholder="Ex: 1h30, 2h..." className="w-full p-2.5 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500" />
-                                            </div>
+                                        <div className="flex gap-2">
+                                            <select value={activityForm.dayId} onChange={e=>setActivityForm({...activityForm, dayId: e.target.value})} className="w-1/2 p-2 border rounded-lg"><option value="">À faire</option>{settings.days.map(d=><option key={d.id} value={d.id}>{d.label}</option>)}</select>
+                                            <select value={activityForm.period} onChange={e=>setActivityForm({...activityForm, period: e.target.value})} className="w-1/2 p-2 border rounded-lg">{PERIODS.map(p=><option key={p.id} value={p.id}>{p.label}</option>)}</select>
                                         </div>
-
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1.5">Planifier (Jour)</label>
-                                                <select value={activityForm.dayId} onChange={(e) => setActivityForm({...activityForm, dayId: e.target.value})} className="w-full p-2.5 border border-zinc-200 rounded-lg bg-white text-sm focus:outline-none focus:border-indigo-500"><option value="">À faire</option>{settings.days.map(d => <option key={d.id} value={d.id}>{getDayDisplayName(d.id)}</option>)}</select>
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1.5">Type</label>
-                                                <select value={activityForm.type} onChange={(e) => {
-                                                    const newType = e.target.value;
-                                                    let newDuration = activityForm.duration;
-                                                    if (newType === 'restaurant' && !newDuration) newDuration = '1h30';
-                                                    setActivityForm({...activityForm, type: newType, duration: newDuration});
-                                                }} className="w-full p-2.5 border border-zinc-200 rounded-lg bg-white text-sm focus:outline-none focus:border-indigo-500">
-                                                    <option value="visite">Lieu / Visite</option>
-                                                    <option value="restaurant">Restaurant</option>
-                                                </select>
-                                            </div>
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
-                                                <Icon name="list" size={14} /> Commentaires / Astuces
-                                            </label>
-                                            <textarea value={activityForm.notes || ''} onChange={(e) => setActivityForm({...activityForm, notes: e.target.value})} placeholder="À ne pas manquer, plat signature, prix d'entrée..." className="w-full p-2.5 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500 min-h-[80px]"></textarea>
-                                        </div>
-
-                                        <div><label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1.5">Lien / URL vidéo (Optionnel)</label><input type="url" value={activityForm.url || ''} onChange={(e) => setActivityForm({...activityForm, url: e.target.value})} placeholder="https://..." className="w-full p-2.5 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500" /></div>
-                                        
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1.5">Planifier (Jour)</label>
-                                                <select value={activityForm.dayId} onChange={(e) => setActivityForm({...activityForm, dayId: e.target.value})} className="w-full p-2.5 border border-zinc-200 rounded-lg bg-white text-sm focus:outline-none focus:border-indigo-500"><option value="">À faire</option>{settings.days.map(d => <option key={d.id} value={d.id}>{getDayDisplayName(d.id)}</option>)}</select>
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1.5">Moment</label>
-                                                <select value={activityForm.period || 'morning'} onChange={(e) => setActivityForm({...activityForm, period: e.target.value})} className="w-full p-2.5 border border-zinc-200 rounded-lg bg-white text-sm focus:outline-none focus:border-indigo-500">
-                                                    {PERIODS.map(p => <option key={p.id} value={p.id}>{p.icon} {p.label}</option>)}
-                                                </select>
-                                            </div>
-                                        </div>
-
-                                        {activityForm.dayId && (
-                                            <div>
-                                                <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1.5">Heure (Optionnel)</label>
-                                                <input type="time" value={activityForm.time} onChange={(e) => setActivityForm({...activityForm, time: e.target.value})} className="w-full p-2.5 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500" />
-                                            </div>
-                                        )}
-                                        <button type="submit" className="w-full bg-indigo-600 text-white font-medium py-3 rounded-lg mt-2 hover:bg-indigo-700 transition-colors">Sauvegarder</button>
+                                        <textarea value={activityForm.notes} onChange={e=>setActivityForm({...activityForm, notes: e.target.value})} placeholder="Notes" className="w-full p-2 border rounded-lg h-24" />
+                                        <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold">Sauvegarder</button>
                                     </form>
                                 </div>
                             </div>
                         )}
-
-                        {/* Modal Journal Éditeur */}
-                        {isJournalModalOpen && editingActivity && (
-                            <JournalEditorModal activity={editingActivity} onClose={() => setIsJournalModalOpen(false)} onSave={saveJournalEntry} handleImageUpload={handleImageUpload} handleRewriteJournalAi={handleRewriteJournalAi} isAiRewriting={isAiRewriting} days={settings.days} getDayDisplayName={getDayDisplayName} />
-                        )}
-                    </div>
-                </div>
-            );
-        }
-
-        // Composant Editeur Journal
-        function JournalEditorModal({ activity, onClose, onSave, handleImageUpload, handleRewriteJournalAi, isAiRewriting, days, getDayDisplayName }) {
-            const isNew = !activity.id;
-            const [name, setName] = useState(activity.name || '');
-            const [address, setAddress] = useState(activity.address || '');
-            const [dayId, setDayId] = useState(activity.dayId || (days[0]?.id || ''));
-            const [time, setTime] = useState(activity.time || '12:00');
-            const [notes, setNotes] = useState(activity.notes || '');
-            const [isLocating, setIsLocating] = useState(false);
-            const [photos, setPhotos] = useState(activity.photos || (activity.photoBase64 ? [activity.photoBase64] : []));
-            const cameraInputRef = useRef(null);
-            const galleryInputRef = useRef(null);
-
-            const handleLocateMe = () => {
-                setIsLocating(true);
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(pos => { setAddress(`${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`); setIsLocating(false); }, err => { alert("Erreur GPS"); setIsLocating(false); }, { enableHighAccuracy: true });
-                } else setIsLocating(false);
-            };
-
-            return (
-                <div className="fixed inset-0 bg-zinc-900/40 backdrop-blur-sm z-50 flex flex-col justify-end">
-                    <div className="bg-white rounded-t-2xl w-full max-w-md mx-auto max-h-[90vh] flex flex-col animate-in slide-in-from-bottom-4 duration-200">
-                        <div className="sticky top-0 bg-white border-b border-zinc-100 px-5 py-4 flex justify-between items-center z-10">
-                            <h3 className="font-semibold text-zinc-900">{isNew ? 'Nouveau Souvenir' : 'Éditer'}</h3>
-                            <button onClick={onClose} className="p-2 text-zinc-400 hover:text-zinc-900 bg-zinc-100 rounded-full"><Icon name="x" size={18} /></button>
-                        </div>
-                        <div className="p-5 overflow-y-auto space-y-6 pb-20">
-                            
-                            <div className="space-y-4 bg-teal-50/30 p-4 rounded-xl border border-teal-100">
-                                <div><label className="text-xs font-semibold text-teal-800 uppercase tracking-wide">Événement</label><input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full mt-1 p-2.5 border border-teal-200 rounded-lg text-sm focus:outline-none focus:border-teal-500" /></div>
-                                <div>
-                                    <label className="text-xs font-semibold text-teal-800 uppercase tracking-wide">Lieu</label>
-                                    <div className="flex gap-2 mt-1">
-                                        <input type="text" value={address} onChange={e => setAddress(e.target.value)} className="flex-1 p-2.5 border border-teal-200 rounded-lg text-sm focus:outline-none focus:border-teal-500" />
-                                        <button onClick={handleLocateMe} className="bg-teal-100 text-teal-700 px-3.5 rounded-lg flex items-center justify-center hover:bg-teal-200 transition-colors">{isLocating ? <Icon name="loader" size={16} className="animate-spin" /> : <Icon name="pin" size={16} />}</button>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div><label className="text-xs font-semibold text-teal-800 uppercase tracking-wide">Jour</label><select value={dayId} onChange={e => setDayId(e.target.value)} className="w-full mt-1 p-2.5 border border-teal-200 rounded-lg text-sm focus:outline-none focus:border-teal-500 bg-white">{days.map(d => <option key={d.id} value={d.id}>{getDayDisplayName(d.id)}</option>)}</select></div>
-                                    <div><label className="text-xs font-semibold text-teal-800 uppercase tracking-wide">Heure</label><input type="time" value={time} onChange={e => setTime(e.target.value)} className="w-full mt-1 p-2.5 border border-teal-200 rounded-lg text-sm focus:outline-none focus:border-teal-500" /></div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="flex items-center gap-1.5 text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-2"><Icon name="camera" size={14} /> Photos</label>
-                                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-                                    {photos.map((p, idx) => (
-                                        <div key={idx} className="relative flex-shrink-0 w-24 h-24 rounded-lg border border-zinc-200 overflow-hidden">
-                                            <img src={p} className="w-full h-full object-cover" />
-                                            <button onClick={() => setPhotos(photos.filter((_, i) => i !== idx))} className="absolute top-1 right-1 bg-red-500/90 text-white rounded-md p-1 hover:bg-red-600"><Icon name="x" size={12} /></button>
-                                        </div>
-                                    ))}
-                                    <div onClick={() => cameraInputRef.current?.click()} className="flex-shrink-0 w-24 h-24 rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 flex flex-col items-center justify-center cursor-pointer text-zinc-400 hover:text-zinc-600 hover:border-zinc-400 transition-colors">
-                                        <Icon name="camera" size={22} className="mb-1" />
-                                        <span className="text-[10px] font-bold uppercase">Prendre</span>
-                                    </div>
-                                    <div onClick={() => galleryInputRef.current?.click()} className="flex-shrink-0 w-24 h-24 rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 flex flex-col items-center justify-center cursor-pointer text-zinc-400 hover:text-zinc-600 hover:border-zinc-400 transition-colors">
-                                        <Icon name="image" size={22} className="mb-1" />
-                                        <span className="text-[10px] font-bold uppercase">Galerie</span>
-                                    </div>
-                                </div>
-                                <input type="file" accept="image/*" capture="environment" ref={cameraInputRef} className="hidden" onChange={(e) => handleImageUpload(e, (newPhotos) => setPhotos(prev => [...prev, ...newPhotos]))} />
-                                <input type="file" accept="image/*" multiple ref={galleryInputRef} className="hidden" onChange={(e) => handleImageUpload(e, (newPhotos) => setPhotos(prev => [...prev, ...newPhotos]))} />
-                            </div>
-
-                            <div>
-                                <div className="flex justify-between items-end mb-2">
-                                    <label className="flex items-center gap-1.5 text-xs font-semibold text-zinc-500 uppercase tracking-wide"><Icon name="book" size={14} /> Notes</label>
-                                    <button onClick={() => handleRewriteJournalAi(notes, setNotes)} disabled={!notes || isAiRewriting} className="text-xs font-medium text-teal-700 bg-teal-50 px-3 py-1.5 rounded-md hover:bg-teal-100 flex items-center gap-1 transition-colors">
-                                        {isAiRewriting ? <Icon name="loader" size={12} className="animate-spin" /> : <Icon name="sparkles" size={12} />} IA
-                                    </button>
-                                </div>
-                                <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Vos souvenirs ici..." className="w-full p-3 border border-zinc-200 rounded-lg text-sm h-32 focus:outline-none focus:border-teal-500"></textarea>
-                            </div>
-
-                            <button onClick={() => onSave({ id: activity.id, name, address, country: activity.country || '', duration: activity.duration || '', dayId, time, notes, photos, type: activity.type || 'visite', url: activity.url || '', period: activity.period || 'morning' })} disabled={!name} className="w-full bg-teal-600 text-white font-medium py-3 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-teal-700 transition-colors">
-                                <Icon name="check" size={18} /> Enregistrer
-                            </button>
-                        </div>
                     </div>
                 </div>
             );
