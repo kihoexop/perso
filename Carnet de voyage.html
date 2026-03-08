@@ -66,10 +66,16 @@
         ];
 
         // =====================================================================
-        // UTILITAIRES
+        // UTILITAIRES GLOBAUX (Hors des composants pour éviter la recréation)
         // =====================================================================
         const safeGetLocal = (key) => { try { return localStorage.getItem(key) || ''; } catch(e) { return ''; } };
         const safeSetLocal = (key, value) => { try { localStorage.setItem(key, value); } catch(e) {} };
+        const safeRemoveLocal = (key) => { try { localStorage.removeItem(key); } catch(e) {} };
+        
+        // NOUVEAU : Utilitaires de session (les données s'effacent à la fermeture de l'onglet)
+        const safeGetSession = (key) => { try { return sessionStorage.getItem(key) || ''; } catch(e) { return ''; } };
+        const safeSetSession = (key, value) => { try { sessionStorage.setItem(key, value); } catch(e) {} };
+        const safeRemoveSession = (key) => { try { sessionStorage.removeItem(key); } catch(e) {} };
         
         const SVG_ICONS = {
             map: <g><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"></path><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></g>,
@@ -124,7 +130,6 @@
             return null;
         };
 
-        // GÉOCODAGE PLUS INTELLIGENT
         const geocodeAddress = async (address, name, country) => {
             if (!address || address === 'À définir') return { coords: null, fromCache: false };
             
@@ -192,27 +197,79 @@
             callback(newPhotos);
         };
 
-        // Générateur de couleurs pour les jours
         const getDayColor = (dayIndex) => {
-            const colors = [
-                '#3b82f6', // blue-500
-                '#ef4444', // red-500
-                '#10b981', // emerald-500
-                '#f59e0b', // amber-500
-                '#8b5cf6', // violet-500
-                '#ec4899', // pink-500
-                '#06b6d4', // cyan-500
-                '#f97316', // orange-500
-                '#6366f1', // indigo-500
-                '#84cc16'  // lime-500
-            ];
+            const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#6366f1', '#84cc16'];
             return colors[dayIndex % colors.length];
         };
 
         // =====================================================================
-        // COMPOSANTS EXTRAITS
+        // COMPOSANTS OPTIMISÉS
         // =====================================================================
 
+        // Composant d'Input isolant les frappes clavier (Performance ++)
+        const HotelInput = React.memo(({ currentAddress, onSave }) => {
+            const [val, setVal] = useState(currentAddress || '');
+            useEffect(() => { setVal(currentAddress || ''); }, [currentAddress]);
+            
+            return (
+                <input 
+                    type="text" 
+                    value={val} 
+                    onChange={(e) => setVal(e.target.value)} 
+                    onBlur={() => val !== currentAddress && onSave(val)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.target.blur(); } }}
+                    placeholder="Adresse de l'hôtel (Appuyez sur Entrée pour valider)" 
+                    className="w-full px-3 py-2 text-sm bg-white border border-orange-200 rounded-lg outline-none focus:border-orange-400" 
+                />
+            );
+        });
+
+        // Composant isolant la recherche IA (Performance ++)
+        const HotelAIBox = React.memo(({ geminiKey, geminiModel, onSelect }) => {
+            const [query, setQuery] = useState('');
+            const [suggestions, setSuggestions] = useState(null);
+            const [loading, setLoading] = useState(false);
+
+            const search = async () => {
+                if (!query || !geminiKey) return;
+                setLoading(true);
+                try {
+                    const prompt = `Trouve jusqu'à 3 adresses exactes possibles pour cet hôtel ou hébergement : "${query}". Réponds UNIQUEMENT avec un tableau JSON (sans markdown) contenant des objets avec "name" et "address". Exemple: [{"name": "Hôtel A", "address": "Adresse A"}]`;
+                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`, { method: 'POST', body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
+                    const data = await res.json();
+                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                    setSuggestions(JSON.parse(text.replace(/```json|```/g, '').trim()));
+                } catch(e) { }
+                setLoading(false);
+            };
+
+            if (!geminiModel) return null;
+
+            return (
+                <div className="mb-3">
+                    <div className="flex gap-2">
+                        <input type="text" value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} placeholder="Rechercher avec l'IA (ex: The Venetian...)" className="flex-1 px-3 py-2 text-sm bg-white border border-orange-200 rounded-lg outline-none focus:border-orange-400" />
+                        <button onClick={search} disabled={loading || !query} className="bg-orange-500 text-white px-3.5 rounded-lg disabled:opacity-50 flex items-center justify-center hover:bg-orange-600 transition-colors shadow-sm">
+                            {loading ? <Icon name="loader" size={16} className="animate-spin" /> : <Icon name="sparkles" size={16} />}
+                        </button>
+                    </div>
+                    {suggestions?.length > 0 && (
+                        <div className="mt-2 space-y-2 max-h-48 overflow-y-auto scrollbar-hide animate-in fade-in duration-200">
+                            <p className="text-[10px] uppercase font-bold text-orange-400 pl-1">Propositions :</p>
+                            {suggestions.map((s, i) => (
+                                <div key={i} className="p-3 bg-white border border-orange-100 rounded-lg text-sm shadow-sm">
+                                    <p className="font-semibold text-zinc-900">{s.name}</p>
+                                    <p className="text-xs text-zinc-500 mb-2 mt-0.5">{s.address}</p>
+                                    <button onClick={() => { onSelect(`${s.name}, ${s.address}`); setSuggestions(null); setQuery(''); }} className="w-full bg-orange-50 text-orange-700 font-medium py-1.5 rounded hover:bg-orange-100 transition-colors">Sélectionner</button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        });
+
+        // Composant Carte d'Activité
         const ActivityCard = React.memo(({ activity, isPlanner, showTime, showCountry, isExpanded, onToggle, onEdit, onDelete, onAssign, getDayDisplayName, days }) => {
             const borderColor = activity.type === 'restaurant' ? 'border-l-orange-400' : 'border-l-blue-400';
             const displayCountry = activity.country || detectCountry(activity.address);
@@ -296,7 +353,7 @@
             );
         });
 
-        // Composant Map Leaflet CORRIGÉ AVEC COULEURS DYNAMIQUES ET PLANIFICATION INTÉGRÉE
+        // Composant Map Leaflet
         const MapComponent = React.memo(({ activities, countryFilter, days, onAssign, getDayDisplayName }) => {
             const mapRef = useRef(null);
             const mapInstanceRef = useRef(null);
@@ -305,14 +362,8 @@
 
             useEffect(() => {
                 if (!mapInstanceRef.current && mapRef.current) {
-                    // Initialiser la carte
                     mapInstanceRef.current = L.map(mapRef.current).setView([20, 0], 2);
-                    
-                    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { 
-                        attribution: '&copy; OSM', 
-                        maxZoom: 19 
-                    }).addTo(mapInstanceRef.current);
-                    
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '&copy; OSM', maxZoom: 19 }).addTo(mapInstanceRef.current);
                     markersLayerRef.current = L.layerGroup().addTo(mapInstanceRef.current);
                     setIsMapReady(true);
                 }
@@ -320,7 +371,6 @@
                 const resizeTimer = setTimeout(() => {
                     if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize();
                 }, 300);
-
                 return () => clearTimeout(resizeTimer);
             }, []);
 
@@ -336,9 +386,7 @@
 
                     filtered.forEach(act => {
                         if (act.coordinates?.lat && act.coordinates?.lon) {
-                            
-                            // Logique de couleur : Noir si non planifié, couleur unique si planifié
-                            let markerColor = '#18181b'; // Noir par défaut (zinc-900)
+                            let markerColor = '#18181b'; 
                             let dayLabel = 'Non planifié';
                             
                             if (act.dayId) {
@@ -350,7 +398,6 @@
                             }
 
                             const isResto = act.type === 'restaurant';
-                            // Forme différente pour les restos (carré arrondi) vs visites (rond)
                             const borderRadius = isResto ? '4px' : '50%';
                             
                             const customIcon = L.divIcon({
@@ -359,54 +406,240 @@
                                 iconSize: [18, 18], iconAnchor: [9, 9]
                             });
 
-                            // Création du contenu de la popup sous forme d'élément DOM pour y attacher un événement
                             const popupDiv = document.createElement('div');
                             popupDiv.style.cssText = "text-align: center; padding: 4px; min-width: 140px;";
                             
                             let optionsHtml = `<option value="" disabled ${!act.dayId ? 'selected' : ''}>Planifier ce lieu...</option>`;
                             optionsHtml += `<option value="">-- À faire (Retirer) --</option>`;
-                            days.forEach(d => {
-                                optionsHtml += `<option value="${d.id}" ${act.dayId === d.id ? 'selected' : ''}>${getDayDisplayName(d.id)}</option>`;
-                            });
+                            days.forEach(d => { optionsHtml += `<option value="${d.id}" ${act.dayId === d.id ? 'selected' : ''}>${getDayDisplayName(d.id)}</option>`; });
 
                             popupDiv.innerHTML = `
                                 <b style="font-size: 14px; color: #18181b;">${act.name}</b><br>
-                                <span style="font-size: 11px; color: ${markerColor}; font-weight: bold;">
-                                    ${act.dayId ? `📅 ${dayLabel}` : '📋 À faire'}
-                                </span><br>
-                                <select class="map-day-selector" style="margin-top: 8px; width: 100%; padding: 6px 4px; border-radius: 6px; border: 1px solid #e4e4e7; font-size: 12px; background: #f4f4f5; color: #18181b; outline: none; cursor: pointer;">
+                                <span style="font-size: 11px; color: ${markerColor}; font-weight: bold;">${act.dayId ? `📅 ${dayLabel}` : '📋 À faire'}</span><br>
+                                <select class="map-day-selector" style="margin-top: 8px; width: 100%; padding: 6px 4px; border-radius: 6px; border: 1px solid #e4e4e7; font-size: 12px; background: #f4f4f5; outline: none; cursor: pointer;">
                                     ${optionsHtml}
                                 </select>
                                 <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(act.address)}" target="_blank" style="display: inline-block; margin-top: 8px; background: #18181b; color: white; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: bold; width: 100%; box-sizing: border-box;">Ouvrir Maps</a>
                             `;
 
-                            // On écoute le changement de valeur dans le menu déroulant
                             const selectEl = popupDiv.querySelector('.map-day-selector');
                             selectEl.addEventListener('change', (e) => {
                                 if (onAssign) onAssign(act, e.target.value);
                                 if (mapInstanceRef.current) mapInstanceRef.current.closePopup();
                             });
 
-                            const marker = L.marker([act.coordinates.lat, act.coordinates.lon], {icon: customIcon})
-                                .bindPopup(popupDiv);
-                                
+                            const marker = L.marker([act.coordinates.lat, act.coordinates.lon], {icon: customIcon}).bindPopup(popupDiv);
                             markersLayerRef.current.addLayer(marker);
                             bounds.push([act.coordinates.lat, act.coordinates.lon]);
                         }
                     });
 
-                    if (bounds.length > 0) {
-                        mapInstanceRef.current.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
-                    } else if (countryFilter === 'all') {
-                        mapInstanceRef.current.setView([20, 0], 2);
-                    }
+                    if (bounds.length > 0) mapInstanceRef.current.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
+                    else if (countryFilter === 'all') mapInstanceRef.current.setView([20, 0], 2);
                 }
-            }, [activities, countryFilter, isMapReady, days]);
+            }, [activities, countryFilter, isMapReady, days, getDayDisplayName, onAssign]);
 
             return (
                 <div className="w-full h-full relative bg-zinc-100 flex items-center justify-center">
                     {!isMapReady && <div className="text-zinc-400 text-sm flex items-center gap-2"><Icon name="loader" className="animate-spin" /> Chargement carte...</div>}
                     <div ref={mapRef} className="absolute inset-0 z-10" />
+                </div>
+            );
+        });
+
+        // Composant Modale des Paramètres (isolée)
+        const SettingsModal = React.memo(({ onClose, settings, saveSettings, geminiKey, setGeminiKey, geminiModel, setGeminiModel, handleAutoFill, isUpdatingData, updateMessage, handleExportJson }) => {
+            const [tempKeyInput, setTempKeyInput] = useState('');
+            const [isKeyValidating, setIsKeyValidating] = useState(false);
+            const [keyValidationError, setKeyValidationError] = useState('');
+
+            const validateGeminiKey = async () => {
+                if (!tempKeyInput) return;
+                setIsKeyValidating(true); setKeyValidationError('');
+                try {
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${tempKeyInput}`);
+                    if (!response.ok) throw new Error("Clé API invalide ou refusée.");
+                    const data = await response.json();
+                    const validModels = data.models.filter(m => m.supportedGenerationMethods?.includes('generateContent'));
+                    if (!validModels.length) throw new Error("Aucun modèle compatible trouvé.");
+                    
+                    let detectedModel = validModels.find(m => m.name.includes('gemini-1.5-flash'))?.name.replace('models/', '') 
+                                     || validModels[0].name.replace('models/', '');
+
+                    setGeminiKey(tempKeyInput); setGeminiModel(detectedModel);
+                    
+                    // Sauvegarde uniquement pour la session en cours
+                    safeSetSession('gemini_api_key', tempKeyInput); 
+                    safeSetSession('gemini_model_id', detectedModel);
+                    setTempKeyInput('');
+                } catch (error) {
+                    setKeyValidationError(error.message); setGeminiKey(''); setGeminiModel('');
+                    safeRemoveSession('gemini_api_key'); 
+                    safeRemoveSession('gemini_model_id');
+                }
+                setIsKeyValidating(false);
+            };
+
+            return (
+                <div className="fixed inset-0 bg-zinc-900/40 backdrop-blur-sm z-50 flex flex-col justify-end animate-in fade-in duration-200">
+                    <div className="bg-white rounded-t-2xl shadow-xl w-full max-w-md mx-auto p-5 pb-10 space-y-6 animate-in slide-in-from-bottom-4 duration-200">
+                        <div className="flex justify-between items-center"><h3 className="font-semibold text-lg flex items-center gap-2"><Icon name="settings" className="text-indigo-600" /> Paramètres</h3><button onClick={onClose} className="p-2 bg-zinc-100 rounded-full"><Icon name="x" /></button></div>
+                        <div><label className="text-xs font-bold text-zinc-600 mb-1 block">Date de début du voyage</label><input type="date" value={settings.startDate} onChange={e => saveSettings({...settings, startDate: e.target.value})} className="w-full p-3 border border-zinc-200 rounded-lg outline-none focus:border-indigo-500" /></div>
+                        <div>
+                            <label className="text-xs font-bold text-zinc-600 mb-1 flex justify-between"><span>Clé IA Google Gemini</span> <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-indigo-600 underline">Obtenir</a></label>
+                            <input type="password" value={tempKeyInput} onChange={e => setTempKeyInput(e.target.value)} placeholder={geminiKey ? "••••••••••••••••" : "Collez la clé ici..."} className="w-full p-3 border border-zinc-200 rounded-lg outline-none focus:border-indigo-500" />
+                            <button onClick={validateGeminiKey} disabled={isKeyValidating || !tempKeyInput} className="w-full bg-indigo-600 text-white py-3 rounded-lg mt-2 font-medium disabled:opacity-50">{isKeyValidating ? 'Vérification...' : 'Valider la clé'}</button>
+                            {geminiModel && <div className="mt-2 p-2 bg-emerald-50 text-emerald-800 text-xs rounded border border-emerald-100 text-center">IA Connectée : {geminiModel}</div>}
+                            {keyValidationError && <p className="text-xs text-red-500 mt-1">{keyValidationError}</p>}
+                        </div>
+                        <div className="pt-4 border-t border-zinc-100 space-y-3">
+                            <div>
+                                <button onClick={handleAutoFill} disabled={isUpdatingData} className="w-full bg-indigo-50 text-indigo-700 py-3 rounded-lg font-medium flex items-center justify-center gap-2 disabled:opacity-50">{isUpdatingData ? <Icon name="loader" className="animate-spin" /> : <Icon name="sparkles" />} Auto-compléter (Durées/Pays)</button>
+                                {updateMessage && <p className="text-xs text-center text-indigo-600 mt-2 font-medium">{updateMessage}</p>}
+                            </div>
+                            <button onClick={handleExportJson} className="w-full bg-white border border-zinc-300 text-zinc-700 font-medium py-3 rounded-lg flex justify-center items-center gap-2"><Icon name="download" size={16} /> Exporter les données (JSON)</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        });
+
+        // Composant Modale d'Activité / Journal (isolée)
+        const ActivityModal = React.memo(({ onClose, initialData, onSave, settings, PERIODS, geminiKey, geminiModel, days }) => {
+            const [form, setForm] = useState(initialData);
+            const [aiQuery, setAiQuery] = useState('');
+            const [aiSuggestion, setAiSuggestion] = useState(null);
+            const [isAiLoading, setIsAiLoading] = useState(false);
+            const [isRewriting, setIsRewriting] = useState(false);
+
+            const askGemini = async (prompt) => {
+                if(!geminiKey || !geminiModel) { alert("Clé IA manquante (Voir Paramètres)"); return null; }
+                try {
+                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`, { method: 'POST', body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
+                    const data = await res.json();
+                    return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                } catch (e) { return null; }
+            };
+
+            const handleSearchAi = async (e) => {
+                e.preventDefault();
+                if (!aiQuery) return;
+                setIsAiLoading(true); setAiSuggestion(null);
+                const res = await askGemini(`Trouve jusqu'à 3 lieux pour : "${aiQuery}". Réponds UNIQUEMENT en JSON: [{"name": "Nom", "address": "Adresse complète", "country": "Pays", "duration": "1h30"}]. Restaurant = duration min 1h.`);
+                if (res) {
+                    try { setAiSuggestion(JSON.parse(res.replace(/```json|```/g, '').trim())); } catch(e) {}
+                }
+                setIsAiLoading(false);
+            };
+
+            const handleRewriteNotes = async () => {
+                if (!form.notes) return;
+                setIsRewriting(true);
+                const res = await askGemini(`Agis comme un écrivain de voyage. Réécris ce brouillon de manière poétique, vivante et bien formulée en français. Ne renvoie que le texte. Brouillon : "${form.notes}"`);
+                if (res) setForm({...form, notes: res.trim()});
+                setIsRewriting(false);
+            };
+
+            return (
+                <div className="fixed inset-0 bg-zinc-900/40 backdrop-blur-sm z-40 flex flex-col justify-end animate-in fade-in duration-200">
+                    <div className="bg-white rounded-t-2xl w-full max-w-md mx-auto h-[85vh] overflow-y-auto animate-in slide-in-from-bottom-4 duration-200 shadow-xl">
+                        <div className="sticky top-0 bg-white border-b border-zinc-100 px-5 py-4 flex justify-between items-center z-10">
+                            <h3 className="font-bold text-zinc-900 text-lg">{form.id ? 'Modifier' : 'Nouvelle étape'}</h3>
+                            <button onClick={onClose} className="p-2 bg-zinc-100 text-zinc-500 rounded-full hover:text-zinc-900"><Icon name="x"/></button>
+                        </div>
+                        
+                        {!form.id && (
+                            <div className="p-5 bg-indigo-50/50 border-b border-indigo-50">
+                                <div className="flex gap-2">
+                                    <input value={aiQuery} onChange={e => setAiQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSearchAi(e)} placeholder="Rechercher avec l'IA (ex: Musée...)" className="flex-1 p-2.5 rounded-lg border border-indigo-200 outline-none focus:border-indigo-400 text-sm" />
+                                    <button onClick={handleSearchAi} className="bg-indigo-600 text-white px-3.5 rounded-lg flex items-center justify-center hover:bg-indigo-700">
+                                        {isAiLoading ? <Icon name="loader" size={16} className="animate-spin" /> : <Icon name="sparkles" size={16}/>}
+                                    </button>
+                                </div>
+                                {aiSuggestion && aiSuggestion.map((s, i) => (
+                                    <div key={i} className="mt-3 p-3 bg-white border border-indigo-100 rounded-lg shadow-sm">
+                                        <b className="text-sm">{s.name}</b><p className="text-xs text-zinc-500">{s.address}</p>
+                                        <button onClick={() => { setForm({...form, ...s, duration: s.duration || (form.type === 'restaurant' ? '1h30' : '')}); setAiSuggestion(null); setAiQuery(''); }} className="w-full mt-2 bg-indigo-50 text-indigo-700 font-medium py-1.5 rounded text-sm">Choisir ce lieu</button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        <form onSubmit={(e) => { e.preventDefault(); onSave(form); }} className="p-5 space-y-5 pb-10">
+                            {/* Photos */}
+                            <div>
+                                <label className="block text-xs font-semibold text-zinc-500 uppercase mb-2 flex items-center gap-1.5"><Icon name="image" size={14} /> Photos / Inspirations</label>
+                                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                                    {form.photos && form.photos.map((p, idx) => (
+                                        <div key={idx} className="relative flex-shrink-0 w-20 h-20 rounded-lg border border-zinc-200 overflow-hidden shadow-sm">
+                                            <img src={p} className="w-full h-full object-cover" />
+                                            <button type="button" onClick={() => setForm({...form, photos: form.photos.filter((_, i) => i !== idx)})} className="absolute top-1 right-1 bg-zinc-900/70 text-white p-1 rounded-md backdrop-blur-sm"><Icon name="x" size={12} /></button>
+                                        </div>
+                                    ))}
+                                    <label className="flex-shrink-0 w-20 h-20 rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 flex flex-col items-center justify-center cursor-pointer text-zinc-400 hover:text-indigo-600 transition-colors">
+                                        <Icon name="camera" size={18} className="mb-0.5" /><span className="text-[9px] font-bold uppercase">Prendre</span>
+                                        <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleImageUpload(e, (newPhotos) => setForm({...form, photos: [...(form.photos || []), ...newPhotos]}))} />
+                                    </label>
+                                    <label className="flex-shrink-0 w-20 h-20 rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 flex flex-col items-center justify-center cursor-pointer text-zinc-400 hover:text-indigo-600 transition-colors">
+                                        <Icon name="image" size={18} className="mb-0.5" /><span className="text-[9px] font-bold uppercase">Galerie</span>
+                                        <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleImageUpload(e, (newPhotos) => setForm({...form, photos: [...(form.photos || []), ...newPhotos]}))} />
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div><label className="block text-xs font-semibold text-zinc-500 uppercase mb-1">Nom</label><input required value={form.name} onChange={e=>setForm({...form, name: e.target.value})} className="w-full p-2.5 border border-zinc-200 rounded-lg text-sm outline-none focus:border-indigo-500" /></div>
+                            <div><label className="block text-xs font-semibold text-zinc-500 uppercase mb-1">Adresse</label><input required value={form.address} onChange={e=>setForm({...form, address: e.target.value})} className="w-full p-2.5 border border-zinc-200 rounded-lg text-sm outline-none focus:border-indigo-500" /></div>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className="block text-xs font-semibold text-zinc-500 uppercase mb-1">Pays</label><input value={form.country} onChange={e=>setForm({...form, country: e.target.value})} placeholder="Auto si vide" className="w-full p-2.5 border border-zinc-200 rounded-lg text-sm outline-none focus:border-indigo-500" /></div>
+                                <div><label className="block text-xs font-semibold text-zinc-500 uppercase mb-1">Durée</label><input value={form.duration} onChange={e=>setForm({...form, duration: e.target.value})} placeholder="Ex: 1h30" className="w-full p-2.5 border border-zinc-200 rounded-lg text-sm outline-none focus:border-indigo-500" /></div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1">Planifier</label>
+                                    <select value={form.dayId} onChange={e=>setForm({...form, dayId: e.target.value})} className="w-full p-2.5 border border-zinc-200 rounded-lg bg-white text-sm outline-none focus:border-indigo-500">
+                                        <option value="">À faire (Idées)</option>
+                                        {days.map(d=><option key={d.id} value={d.id}>{d.label}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1">Type</label>
+                                    <select value={form.type} onChange={e=>setForm({...form, type: e.target.value, duration: e.target.value === 'restaurant' && !form.duration ? '1h30' : form.duration})} className="w-full p-2.5 border border-zinc-200 rounded-lg bg-white text-sm outline-none focus:border-indigo-500">
+                                        <option value="visite">Lieu / Visite</option><option value="restaurant">Restaurant</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div className="flex justify-between items-end mb-1">
+                                    <label className="text-xs font-semibold text-zinc-500 uppercase flex items-center gap-1.5"><Icon name="list" size={14} /> Notes & Souvenirs</label>
+                                    <button type="button" onClick={handleRewriteNotes} disabled={!form.notes || isRewriting} className="text-[10px] font-bold text-teal-700 bg-teal-50 px-2 py-1 rounded hover:bg-teal-100 flex items-center gap-1 transition-colors">
+                                        {isRewriting ? <Icon name="loader" size={12} className="animate-spin" /> : <Icon name="sparkles" size={12} />} IA Magique
+                                    </button>
+                                </div>
+                                <textarea value={form.notes} onChange={e=>setForm({...form, notes: e.target.value})} placeholder="Vos souvenirs, plats testés..." className="w-full p-3 border border-zinc-200 rounded-lg text-sm outline-none focus:border-teal-500 h-28" />
+                            </div>
+
+                            {form.dayId && (
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1">Moment</label>
+                                        <select value={form.period} onChange={e=>setForm({...form, period: e.target.value})} className="w-full p-2.5 border border-zinc-200 rounded-lg bg-white text-sm outline-none focus:border-indigo-500">
+                                            {PERIODS.map(p=><option key={p.id} value={p.id}>{p.label}</option>)}
+                                        </select>
+                                    </div>
+                                    <div><label className="block text-xs font-semibold text-zinc-500 uppercase mb-1">Heure</label><input type="time" value={form.time} onChange={e=>setForm({...form, time: e.target.value})} className="w-full p-2.5 border border-zinc-200 rounded-lg text-sm outline-none focus:border-indigo-500" /></div>
+                                </div>
+                            )}
+                            
+                            <div><label className="block text-xs font-semibold text-zinc-500 uppercase mb-1">Lien / Site web</label><input type="url" value={form.url} onChange={e=>setForm({...form, url: e.target.value})} placeholder="https://..." className="w-full p-2.5 border border-zinc-200 rounded-lg text-sm outline-none focus:border-indigo-500" /></div>
+
+                            <button type="submit" className="w-full bg-indigo-600 text-white py-3.5 rounded-xl font-bold hover:bg-indigo-700 shadow-md flex justify-center items-center gap-2 mt-4">
+                                <Icon name="check" size={18} /> {form.id ? 'Mettre à jour' : 'Ajouter'}
+                            </button>
+                        </form>
+                    </div>
                 </div>
             );
         });
@@ -417,7 +650,6 @@
         function App() {
             const [user, setUser] = useState(null);
             const [isInitializing, setIsInitializing] = useState(true);
-            const [authError, setAuthError] = useState(null);
             
             const [activities, setActivities] = useState([]);
             const [settings, setSettings] = useState({ startDate: '', days: [{ id: 'day-1', label: 'Jour 1', hotelAddress: '' }] });
@@ -428,26 +660,13 @@
             const [mapCountryFilter, setMapCountryFilter] = useState('all');
             const [expandedIds, setExpandedIds] = useState(new Set());
             
-            const [isModalOpen, setIsModalOpen] = useState(false);
-            const [isJournalModalOpen, setIsJournalModalOpen] = useState(false);
-            const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+            // Gestion optimisée des modales
+            const [modalState, setModalState] = useState({ isOpen: false, data: null });
+            const [isSettingsOpen, setIsSettingsOpen] = useState(false);
             
-            const [editingActivity, setEditingActivity] = useState(null);
-            const [activityForm, setActivityForm] = useState({ name: '', type: 'visite', address: '', country: '', duration: '', time: '10:00', dayId: '', url: '', photos: [], notes: '', period: 'morning' });
-            
-            const [geminiKey, setGeminiKey] = useState(safeGetLocal('gemini_api_key'));
-            const [geminiModel, setGeminiModel] = useState(safeGetLocal('gemini_model_id'));
-            const [tempKeyInput, setTempKeyInput] = useState('');
-            const [isKeyValidating, setIsKeyValidating] = useState(false);
-            const [keyValidationError, setKeyValidationError] = useState('');
+            const [geminiKey, setGeminiKey] = useState(safeGetSession('gemini_api_key'));
+            const [geminiModel, setGeminiModel] = useState(safeGetSession('gemini_model_id'));
 
-            const [aiQuery, setAiQuery] = useState('');
-            const [aiSuggestion, setAiSuggestion] = useState(null);
-            const [isAiLoading, setIsAiLoading] = useState(false);
-            const [aiHotelQuery, setAiHotelQuery] = useState('');
-            const [aiHotelSuggestion, setAiHotelSuggestion] = useState(null);
-            const [isHotelAiLoading, setIsHotelAiLoading] = useState(false);
-            const [isAiRewriting, setIsAiRewriting] = useState(false);
             const [isUpdatingData, setIsUpdatingData] = useState(false);
             const [updateMessage, setUpdateMessage] = useState('');
             
@@ -455,10 +674,7 @@
 
             // INIT FIREBASE
             useEffect(() => {
-                const init = async () => {
-                    try { await auth.signInAnonymously(); } catch (e) { setAuthError(e.message); }
-                };
-                init();
+                auth.signInAnonymously().catch(() => {});
                 return auth.onAuthStateChanged((u) => { setUser(u); setIsInitializing(false); });
             }, []);
 
@@ -478,10 +694,9 @@
                 return () => { unsubSet(); unsubAct(); };
             }, [user]);
 
-            // GEOCODING WORKER STABLE
+            // GEOCODING WORKER
             useEffect(() => {
                 if (!user || activeTab !== 'map' || isGeocodingRef.current) return;
-                
                 const toGeocode = activities.filter(a => !a.coordinates && !a.geocodeFailed && a.address && a.address !== 'À définir');
                 if (!toGeocode.length) return;
                 
@@ -491,27 +706,20 @@
                 const runGeocoding = async () => {
                     for (let i = 0; i < toGeocode.length; i++) {
                         if (!isMounted || activeTab !== 'map') break; 
-                        
                         const act = toGeocode[i];
                         const { coords } = await geocodeAddress(act.address, act.name, act.country);
-                        
                         try {
-                            if (coords) {
-                                await db.doc(`trips/${tripId}/activities/${act.id}`).update({ coordinates: coords, geocodeFailed: false });
-                            } else {
-                                await db.doc(`trips/${tripId}/activities/${act.id}`).update({ geocodeFailed: true });
-                            }
+                            if (coords) await db.doc(`trips/${tripId}/activities/${act.id}`).update({ coordinates: coords, geocodeFailed: false });
+                            else await db.doc(`trips/${tripId}/activities/${act.id}`).update({ geocodeFailed: true });
                         } catch(e) {}
                     }
                     isGeocodingRef.current = false;
                 };
-                
                 runGeocoding();
-                
                 return () => { isMounted = false; isGeocodingRef.current = false; };
             }, [activities, user, activeTab]);
 
-            // CALCULS MEMORISÉS
+            // CALCULS MEMORISÉS (Performance ++)
             const getDayDisplayName = useCallback((dayId) => {
                 const index = settings.days.findIndex(d => d.id === dayId);
                 if (index === -1) return 'Jour inconnu';
@@ -559,9 +767,18 @@
             }, [activities, mapCountryFilter]);
 
             // ACTIONS
-            const toggleExpand = useCallback((id) => {
-                setExpandedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-            }, []);
+            const toggleExpand = useCallback((id) => setExpandedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }), []);
+            
+            const saveSettings = useCallback(async (newSettings) => {
+                setSettings(newSettings);
+                if (user) {
+                    try {
+                        await db.doc(`trips/${tripId}/settings/main`).set(newSettings, { merge: true });
+                    } catch (e) {
+                        console.warn("Échec sauvegarde Firestore", e);
+                    }
+                }
+            }, [user]);
 
             const deleteActivity = useCallback(async (id) => user && await db.doc(`trips/${tripId}/activities/${id}`).delete(), [user]);
             const assignActivityToDay = useCallback(async (activity, dayId) => user && await db.doc(`trips/${tripId}/activities/${activity.id}`).update({ dayId: dayId || '' }), [user]);
@@ -569,47 +786,39 @@
             const handleAddDay = useCallback(() => user && db.doc(`trips/${tripId}/settings/main`).set({ ...settings, days: [...settings.days, { id: `day-${Date.now()}`, label: `Jour ${settings.days.length + 1}`, hotelAddress: '' }] }, {merge:true}), [user, settings]);
 
             const openActivityModal = useCallback((activity = null) => {
-                setEditingActivity(activity);
-                setActivityForm(activity ? { ...activity, photos: activity.photos || [] } : { name: '', type: 'visite', address: '', country: '', duration: '', time: '10:00', period: 'morning', dayId: activeTab === 'planner' ? activeDayId : '', url: '', photos: [], notes: '' });
-                setIsModalOpen(true);
-            }, [activeTab, activeDayId]);
+                setModalState({ isOpen: true, data: activity });
+            }, []);
 
-            const saveActivity = async (e) => {
-                e.preventDefault();
-                let finalCountry = activityForm.country || detectCountry(activityForm.address) || '';
-                const data = { ...activityForm, country: finalCountry };
+            const openSpontaneousJournalModal = useCallback(() => {
+                const now = new Date();
+                setModalState({ 
+                    isOpen: true, 
+                    data: { 
+                        id: null, name: '', type: 'visite', address: '', country: '', duration: '', 
+                        time: `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`, 
+                        dayId: settings.days.find(d => d.id === activeDayId)?.id || settings.days[0]?.id || '', 
+                        url: '', photos: [], notes: '', period: 'morning' 
+                    } 
+                });
+            }, [settings.days, activeDayId]);
+
+            const saveActivity = useCallback(async (formData) => {
+                let finalCountry = formData.country || detectCountry(formData.address) || '';
+                const data = { ...formData, country: finalCountry };
                 
-                if (editingActivity && editingActivity.address !== activityForm.address) {
+                if (data.id && modalState.data && modalState.data.address !== formData.address) {
                     data.coordinates = null;
                     data.geocodeFailed = false;
-                } else if (!editingActivity) {
+                } else if (!data.id) {
                     data.geocodeFailed = false;
                 }
 
-                if (editingActivity) await db.doc(`trips/${tripId}/activities/${editingActivity.id}`).update(data);
-                else await db.collection(`trips/${tripId}/activities`).add(data);
-                setIsModalOpen(false);
-            };
-
-            const askGemini = async (prompt) => {
-                if(!geminiKey || !geminiModel) { setIsSettingsModalOpen(true); return null; }
-                try {
-                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`, { method: 'POST', body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
-                    const data = await res.json();
-                    return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-                } catch (e) { return null; }
-            };
-
-            const handleSearchAi = async (e) => {
-                e.preventDefault();
-                if (!aiQuery) return;
-                setIsAiLoading(true); setAiSuggestion(null);
-                const res = await askGemini(`Trouve jusqu'à 3 lieux pour : "${aiQuery}". Réponds UNIQUEMENT en JSON: [{"name": "Nom", "address": "Adresse complète", "country": "Pays", "duration": "1h30"}]. Restaurant = duration min 1h.`);
-                if (res) {
-                    try { setAiSuggestion(JSON.parse(res.replace(/```json|```/g, '').trim())); } catch(e) {}
-                }
-                setIsAiLoading(false);
-            };
+                const { id, ...saveData } = data;
+                if (id) await db.doc(`trips/${tripId}/activities/${id}`).update(saveData);
+                else await db.collection(`trips/${tripId}/activities`).add(saveData);
+                
+                setModalState({ isOpen: false, data: null });
+            }, [modalState.data]);
 
             const handleAutoFill = async () => {
                 setIsUpdatingData(true);
@@ -626,6 +835,14 @@
                 setIsUpdatingData(false); setTimeout(() => setUpdateMessage(''), 3000);
             };
 
+            const handleExportJson = useCallback(() => {
+                const exportData = { version: "1.0", exportDate: new Date().toISOString(), modelId: geminiModel || "non-configure", settings: settings, activities: activities };
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr); downloadAnchorNode.setAttribute("download", "mon_voyage_export.json");
+                document.body.appendChild(downloadAnchorNode); downloadAnchorNode.click(); downloadAnchorNode.remove();
+            }, [geminiModel, settings, activities]);
+
             if (isInitializing) return <div className="min-h-screen flex items-center justify-center text-sm text-zinc-500">Chargement...</div>;
 
             return (
@@ -637,7 +854,7 @@
                                 <div className="p-2 bg-indigo-50 rounded-xl"><Icon name="map" size={20} className="text-indigo-600" /></div>
                                 <div><h1 className="text-lg font-bold text-zinc-900 tracking-tight">Mon Voyage</h1></div>
                             </div>
-                            <button onClick={() => setIsSettingsModalOpen(true)} className="p-2 text-zinc-400 hover:text-zinc-900 relative">
+                            <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-zinc-400 hover:text-zinc-900 relative">
                                 <Icon name="settings" size={22} />
                                 <span className={`absolute top-2 right-2 w-2.5 h-2.5 rounded-full border-2 border-white ${geminiModel ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
                             </button>
@@ -655,29 +872,20 @@
                                         </select>
                                     </div>
                                     
-                                    {/* Conteneur avec HAUTEUR FIXE pour empêcher le bug d'affichage */}
                                     <div className="w-full h-[50vh] min-h-[350px] bg-zinc-200 rounded-xl overflow-hidden shadow-inner border border-zinc-300 relative z-0">
                                         <MapComponent activities={activities} countryFilter={mapCountryFilter} days={settings.days} onAssign={assignActivityToDay} getDayDisplayName={getDayDisplayName} />
                                     </div>
                                     
                                     <div className="space-y-2">
-                                        <p className="text-[10px] text-zinc-500 text-center">
-                                            Les points <b className="text-zinc-900">noirs</b> sont "À faire". Les lieux planifiés sont colorés par jour.
-                                        </p>
-                                        
-                                        {/* Liste des lieux introuvables */}
+                                        <p className="text-[10px] text-zinc-500 text-center">Les points <b className="text-zinc-900">noirs</b> sont "À faire". Les lieux planifiés sont colorés par jour.</p>
                                         {failedGeocodeActivities.length > 0 && (
                                             <div className="bg-orange-50 border border-orange-100 rounded-xl p-3 shadow-sm max-h-48 overflow-y-auto scrollbar-hide">
-                                                <p className="text-xs text-orange-700 font-bold mb-2 flex items-center gap-1.5">
-                                                    ⚠️ {failedGeocodeActivities.length} lieu(x) introuvable(s) :
-                                                </p>
+                                                <p className="text-xs text-orange-700 font-bold mb-2 flex items-center gap-1.5">⚠️ {failedGeocodeActivities.length} lieu(x) introuvable(s) :</p>
                                                 <ul className="space-y-1.5">
                                                     {failedGeocodeActivities.map(act => (
                                                         <li key={act.id} className="text-xs text-zinc-800 flex justify-between items-center bg-white p-2 rounded-lg border border-orange-100 shadow-sm">
                                                             <span className="truncate pr-2 font-medium">{act.name}</span>
-                                                            <button onClick={() => openActivityModal(act)} className="text-indigo-600 hover:text-indigo-800 flex-shrink-0 bg-indigo-50 px-2 py-1 rounded-md text-[10px] font-bold transition-colors">
-                                                                Modifier
-                                                            </button>
+                                                            <button onClick={() => openActivityModal(act)} className="text-indigo-600 hover:text-indigo-800 flex-shrink-0 bg-indigo-50 px-2 py-1 rounded-md text-[10px] font-bold transition-colors">Modifier</button>
                                                         </li>
                                                     ))}
                                                 </ul>
@@ -723,7 +931,8 @@
                                     </div>
                                     <div className="bg-orange-50/50 border border-orange-200/60 rounded-xl p-4">
                                         <label className="text-xs font-semibold text-orange-800 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Icon name="hotel" size={14} className="text-orange-500" /> Hébergement</label>
-                                        <input type="text" value={settings.days.find(d => d.id === activeDayId)?.hotelAddress || ''} onChange={(e) => updateDayHotel(e.target.value)} placeholder="Adresse de l'hôtel" className="w-full px-3 py-2 text-sm bg-white border border-orange-200 rounded-lg outline-none focus:border-orange-400" />
+                                        <HotelAIBox geminiKey={geminiKey} geminiModel={geminiModel} onSelect={updateDayHotel} />
+                                        <HotelInput currentAddress={settings.days.find(d => d.id === activeDayId)?.hotelAddress} onSave={updateDayHotel} />
                                     </div>
                                     <div className="space-y-6 pt-2">
                                         {PERIODS.map(period => plannedActivitiesByPeriod[period.id]?.length > 0 && (
@@ -762,7 +971,7 @@
                                                 <div className="p-4">
                                                     <div className="flex justify-between">
                                                         <div><h3 className="font-semibold text-zinc-900">{activity.name}</h3><p className="text-xs text-zinc-500">{getDayDisplayName(activity.dayId)}</p></div>
-                                                        <button onClick={() => { setEditingActivity(activity); setIsJournalModalOpen(true); }} className="p-2 text-teal-600 bg-teal-50 rounded-full"><Icon name="edit" size={16} /></button>
+                                                        <button onClick={() => openActivityModal(activity)} className="p-2 text-teal-600 bg-teal-50 rounded-full"><Icon name="edit" size={16} /></button>
                                                     </div>
                                                     <p className="text-sm text-zinc-700 mt-3 whitespace-pre-wrap italic border-l-2 border-teal-200 pl-3">{activity.notes || "Ajouter des notes..."}</p>
                                                 </div>
@@ -781,56 +990,23 @@
                             ))}
                         </nav>
 
-                        <button onClick={() => activeTab === 'journal' ? openSpontaneousJournalModal() : openActivityModal()} className={`absolute bottom-24 right-5 w-10 h-10 text-white rounded-full shadow-md z-30 flex items-center justify-center ${activeTab === 'journal' ? 'bg-teal-600' : 'bg-zinc-900'}`}>
+                        <button onClick={() => activeTab === 'journal' ? openSpontaneousJournalModal() : openActivityModal(null)} className={`absolute bottom-24 right-5 w-10 h-10 text-white rounded-full shadow-md z-30 flex items-center justify-center transition-colors ${activeTab === 'journal' ? 'bg-teal-600 hover:bg-teal-700' : 'bg-zinc-900 hover:bg-zinc-800'}`}>
                             <Icon name="plus" size={18} />
                         </button>
 
-                        {/* Modales (Allégées visuellement dans le code) */}
-                        {isSettingsModalOpen && (
-                            <div className="fixed inset-0 bg-zinc-900/40 backdrop-blur-sm z-50 flex flex-col justify-end">
-                                <div className="bg-white rounded-t-2xl shadow-xl w-full max-w-md mx-auto p-5 pb-10 space-y-6">
-                                    <div className="flex justify-between"><h3 className="font-semibold">Paramètres</h3><button onClick={() => setIsSettingsModalOpen(false)}><Icon name="x" /></button></div>
-                                    <div><label className="text-xs font-bold">Date de début</label><input type="date" value={settings.startDate} onChange={e => saveSettings({...settings, startDate: e.target.value})} className="w-full p-2 border rounded-lg mt-1" /></div>
-                                    <div>
-                                        <label className="text-xs font-bold">Clé IA Gemini</label><input type="password" value={tempKeyInput} onChange={e => setTempKeyInput(e.target.value)} placeholder="Clé..." className="w-full p-2 border rounded-lg mt-1" />
-                                        <button onClick={validateGeminiKey} className="w-full bg-indigo-600 text-white py-2 rounded-lg mt-2">Valider</button>
-                                    </div>
-                                    <button onClick={handleAutoFill} disabled={isUpdatingData} className="w-full bg-indigo-50 text-indigo-700 py-3 rounded-lg font-medium">{isUpdatingData ? 'Mise à jour...' : 'Auto-compléter (Durées/Pays)'}</button>
-                                    <button onClick={() => {}} className="w-full bg-zinc-100 py-3 rounded-lg text-sm">Sauvegarder JSON</button>
-                                </div>
-                            </div>
+                        {/* MODALES OPTIMISÉES */}
+                        {isSettingsOpen && (
+                            <SettingsModal 
+                                onClose={() => setIsSettingsOpen(false)} settings={settings} saveSettings={saveSettings} geminiKey={geminiKey} setGeminiKey={setGeminiKey}
+                                geminiModel={geminiModel} setGeminiModel={setGeminiModel} handleAutoFill={handleAutoFill} isUpdatingData={isUpdatingData} updateMessage={updateMessage} handleExportJson={handleExportJson}
+                            />
                         )}
 
-                        {isModalOpen && (
-                            <div className="fixed inset-0 bg-zinc-900/40 backdrop-blur-sm z-40 flex flex-col justify-end">
-                                <div className="bg-white rounded-t-2xl w-full max-w-md mx-auto h-[85vh] overflow-y-auto">
-                                    <div className="sticky top-0 bg-white border-b px-5 py-4 flex justify-between z-10"><h3 className="font-bold">Activité</h3><button onClick={() => setIsModalOpen(false)}><Icon name="x"/></button></div>
-                                    <div className="p-5 bg-indigo-50/50 flex gap-2">
-                                        <input value={aiQuery} onChange={e => setAiQuery(e.target.value)} placeholder="IA : Musée..." className="flex-1 p-2 rounded-lg border" />
-                                        <button onClick={handleSearchAi} className="bg-indigo-600 text-white px-3 rounded-lg"><Icon name="sparkles" size={16}/></button>
-                                    </div>
-                                    {aiSuggestion && aiSuggestion.map((s, i) => (
-                                        <div key={i} className="m-5 p-3 bg-white border rounded-lg shadow-sm">
-                                            <b>{s.name}</b><p className="text-xs">{s.address}</p>
-                                            <button onClick={() => { setActivityForm({...activityForm, ...s}); setAiSuggestion(null); setAiQuery(''); }} className="w-full mt-2 bg-indigo-50 py-1 rounded">Choisir</button>
-                                        </div>
-                                    ))}
-                                    <form onSubmit={saveActivity} className="p-5 space-y-4">
-                                        <input required value={activityForm.name} onChange={e=>setActivityForm({...activityForm, name: e.target.value})} placeholder="Nom" className="w-full p-2 border rounded-lg" />
-                                        <input required value={activityForm.address} onChange={e=>setActivityForm({...activityForm, address: e.target.value})} placeholder="Adresse" className="w-full p-2 border rounded-lg" />
-                                        <div className="flex gap-2">
-                                            <input value={activityForm.country} onChange={e=>setActivityForm({...activityForm, country: e.target.value})} placeholder="Pays" className="w-1/2 p-2 border rounded-lg" />
-                                            <input value={activityForm.duration} onChange={e=>setActivityForm({...activityForm, duration: e.target.value})} placeholder="Durée" className="w-1/2 p-2 border rounded-lg" />
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <select value={activityForm.dayId} onChange={e=>setActivityForm({...activityForm, dayId: e.target.value})} className="w-1/2 p-2 border rounded-lg"><option value="">À faire</option>{settings.days.map(d=><option key={d.id} value={d.id}>{d.label}</option>)}</select>
-                                            <select value={activityForm.period} onChange={e=>setActivityForm({...activityForm, period: e.target.value})} className="w-1/2 p-2 border rounded-lg">{PERIODS.map(p=><option key={p.id} value={p.id}>{p.label}</option>)}</select>
-                                        </div>
-                                        <textarea value={activityForm.notes} onChange={e=>setActivityForm({...activityForm, notes: e.target.value})} placeholder="Notes" className="w-full p-2 border rounded-lg h-24" />
-                                        <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold">Sauvegarder</button>
-                                    </form>
-                                </div>
-                            </div>
+                        {modalState.isOpen && (
+                            <ActivityModal 
+                                isOpen={modalState.isOpen} onClose={() => setModalState({ isOpen: false, data: null })} initialData={modalState.data} onSave={saveActivity} 
+                                settings={settings} PERIODS={PERIODS} geminiKey={geminiKey} geminiModel={geminiModel} days={settings.days}
+                            />
                         )}
                     </div>
                 </div>
