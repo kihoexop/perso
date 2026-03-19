@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPM Coach Pro - Landscape Mode</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --primary: #2563eb;
+            --primary-hover: #3b82f6;
+            --text-main: #ffffff;
+            --text-muted: #94a3b8;
+            --text-dark: #64748b;
+            --danger: #ef4444;
+            --success: #10b981;
+            --warning: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+
+        #app {
+            position: relative;
+            width: 100%;
+            max-width: 450px;
+            height: 100vh; /* Utilise toute la hauteur sur mobile */
+            max-height: 850px;
+            background-color: #0f172a;
+            border-radius: 1.5rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            border: 1px solid #334155;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Responsive : sur les écrans larges ou en paysage, on élargit le conteneur */
+        @media (orientation: landscape) {
+            #app {
+                max-width: 95%;
+                max-height: 95vh;
+            }
+        }
+
+        .digital-font {
+            font-family: "Courier New", Courier, monospace;
+            font-weight: bold;
+            letter-spacing: -2px;
+        }
+
+        .screen {
+            padding: 1.5rem;
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .hidden { display: none !important; }
+
+        /* Boutons */
+        .btn-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .btn-choice {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 1rem;
+            padding: 1.25rem;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .btn-choice:hover {
+            background-color: var(--primary);
+            transform: scale(1.05);
+        }
+
+        .btn-choice span:first-child { font-size: 1.25rem; font-weight: bold; }
+        .btn-choice span:last-child { font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); margin-top: 0.4rem; }
+
+        .btn-start {
+            width: 100%;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 1rem;
+            border-radius: 0.75rem;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
+            margin-top: 1rem;
+        }
+
+        .input-group {
+            margin-bottom: 2rem;
+            background: #1e293b;
+            padding: 1rem;
+            border-radius: 1rem;
+            border: 1px solid #334155;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .input-group input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid var(--primary);
+            color: white;
+            font-size: 1.5rem;
+            font-weight: bold;
+            outline: none;
+            text-align: center;
+        }
+
+        #quit-modal {
+            position: absolute;
+            inset: 0;
+            z-index: 100;
+            background-color: rgba(2, 6, 23, 0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+        }
+
+        .modal-content {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            padding: 2rem;
+            border-radius: 1rem;
+            text-align: center;
+        }
+
+        .modal-btns {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+        }
+
+        /* --- Workout Interface --- */
+        .workout-header {
+            background-color: var(--primary);
+            padding: 0.75rem;
+            text-align: center;
+            z-index: 10;
+        }
+
+        .phase-title {
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        /* Le conteneur qui va switcher en paysage */
+        .workout-layout {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        @media (orientation: landscape) {
+            .workout-layout {
+                flex-direction: row;
+            }
+            .left-panel {
+                width: 50%;
+                border-right: 1px solid #334155;
+                display: flex;
+                flex-direction: column;
+                overflow-y: auto;
+            }
+            .right-panel {
+                width: 50%;
+                display: flex;
+                flex-direction: column;
+            }
+        }
+
+        .stats-area {
+            background-color: #0f172a;
+            padding: 1rem 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .res-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.65rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 0.75rem;
+            border: 1px solid transparent;
+        }
+
+        .res-plat { background-color: rgba(16, 185, 129, 0.2); color: #10b981; border-color: rgba(16, 185, 129, 0.3); }
+        .res-cote-l { background-color: rgba(245, 158, 11, 0.2); color: #f59e0b; border-color: rgba(245, 158, 11, 0.3); }
+        .res-cote-g { background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border-color: rgba(239, 68, 68, 0.3); }
+
+        .timer-circle {
+            position: relative;
+            width: 160px;
+            height: 160px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* En paysage on réduit le cercle pour gagner de la place verticale */
+        @media (orientation: landscape) {
+            .timer-circle {
+                width: 130px;
+                height: 130px;
+            }
+            .timer-circle svg {
+                width: 130px;
+                height: 130px;
+            }
+            .timer-circle circle {
+                r: 60;
+                cx: 65;
+                cy: 65;
+            }
+            #progress-circle {
+                stroke-dasharray: 377; /* 2 * PI * 60 */
+                stroke-dashoffset: 377;
+            }
+        }
+
+        .timer-display {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .dash-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            width: 100%;
+            border-top: 1px solid #334155;
+            border-bottom: 1px solid #334155;
+            background-color: rgba(15, 23, 42, 0.5);
+        }
+
+        .dash-item {
+            padding: 0.75rem 0.25rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border-right: 1px solid #334155;
+        }
+
+        .dash-item:last-child { border-right: none; }
+
+        .controls-bar {
+            padding: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #020617;
+            border-top: 1px solid #334155;
+        }
+
+        .program-list {
+            flex: 1;
+            background-color: rgba(2, 6, 23, 0.5);
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .step-item {
+            background-color: rgba(30, 41, 59, 0.5);
+            border: 1px solid #334155;
+            border-radius: 0.75rem;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transition: all 0.2s;
+        }
+
+        .step-item.active-step {
+            border-color: var(--primary);
+            background-color: rgba(37, 99, 235, 0.1);
+        }
+
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+
+        .pulse { animation: pulse-anim 2s infinite; }
+        @keyframes pulse-anim {
+            0% { box-shadow: 0 0 0 0px rgba(37, 99, 235, 0.4); }
+            100% { box-shadow: 0 0 0 15px rgba(37, 99, 235, 0); }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app">
+        
+        <!-- MODAL QUITTER -->
+        <div id="quit-modal" class="hidden">
+            <div class="modal-content">
+                <h3 style="margin-bottom: 0.5rem;">Abandonner ?</h3>
+                <p style="color: var(--text-muted); font-size: 0.8rem;">La progression sera perdue.</p>
+                <div class="modal-btns">
+                    <button onclick="confirmQuit()" style="background: var(--danger); color: white; border: none; padding: 0.75rem; border-radius: 0.5rem; font-weight: bold; cursor: pointer;">OUI, ARRÊTER</button>
+                    <button onclick="closeQuitModal()" style="background: #334155; color: white; border: none; padding: 0.75rem; border-radius: 0.5rem; font-weight: bold; cursor: pointer;">CONTINUER</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ECRAN DUREE -->
+        <div id="duration-screen" class="screen">
+            <h1 style="color: var(--primary); font-size: 2rem; margin-bottom: 0.5rem;">RPM Coach</h1>
+            <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Étape 1 : Profil et durée</p>
+            
+            <div class="input-group">
+                <label for="user-weight">Votre poids (kg)</label>
+                <input type="number" id="user-weight" value="70" min="30" max="200">
+            </div>
+
+            <div class="btn-grid">
+                <button class="btn-choice" onclick="selectDuration(20)"><span>20</span><span>Min</span></button>
+                <button class="btn-choice" onclick="selectDuration(30)"><span>30</span><span>Min</span></button>
+                <button class="btn-choice" onclick="selectDuration(45)"><span>45</span><span>Min</span></button>
+                <button class="btn-choice" onclick="selectDuration(60)"><span>60</span><span>Min</span></button>
+            </div>
+        </div>
+
+        <!-- ECRAN NIVEAU -->
+        <div id="difficulty-screen" class="screen hidden">
+            <button onclick="resetApp()" style="background: none; border: none; color: var(--primary); cursor: pointer; text-align: left; margin-bottom: 1rem; font-weight: bold;">← RETOUR</button>
+            <h1 style="font-size: 2rem; margin-bottom: 1rem;">Intensité</h1>
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                <button class="btn-choice" style="flex-direction: row; gap: 1rem; width: 100%; align-items: center; text-align: left;" onclick="selectDifficulty('beginner')">
+                    <span style="font-size: 1.5rem;">🌱</span>
+                    <div>
+                        <div style="color: var(--success); font-weight: bold;">Débutant</div>
+                        <div style="font-size: 0.6rem; color: var(--text-muted);">Reprise douce / Initiation</div>
+                    </div>
+                </button>
+                <button class="btn-choice" style="flex-direction: row; gap: 1rem; width: 100%; align-items: center; text-align: left;" onclick="selectDifficulty('intermediate')">
+                    <span style="font-size: 1.5rem;">🚴</span>
+                    <div>
+                        <div style="color: var(--primary-hover); font-weight: bold;">Intermédiaire</div>
+                        <div style="font-size: 0.6rem; color: var(--text-muted);">Endurance et puissance</div>
+                    </div>
+                </button>
+                <button class="btn-choice" style="flex-direction: row; gap: 1rem; width: 100%; align-items: center; text-align: left;" onclick="selectDifficulty('advanced')">
+                    <span style="font-size: 1.5rem;">🔥</span>
+                    <div>
+                        <div style="color: var(--danger); font-weight: bold;">Confirmé</div>
+                        <div style="font-size: 0.6rem; color: var(--text-muted);">Cadences et dénivelés forts</div>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <!-- ECRAN PREVIEW -->
+        <div id="preview-screen" class="screen hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h2 style="font-size: 1.25rem;">Votre Séance</h2>
+                <button onclick="resetApp()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.7rem; font-weight: bold;">ANNULER</button>
+            </div>
+            <div id="preview-list" class="custom-scroll" style="flex: 1; overflow-y: auto; margin-bottom: 1rem;"></div>
+            <button class="btn-start" onclick="startWorkout()">DÉMARRER LA SESSION</button>
+        </div>
+
+        <!-- ECRAN WORKOUT -->
+        <div id="workout-screen" class="hidden h-full flex flex-col">
+            <div class="workout-header">
+                <span id="phase-name" class="phase-title">ÉCHAUFFEMENT</span>
+            </div>
+
+            <div class="workout-layout">
+                <!-- PANNEAU GAUCHE (Stats) -->
+                <div class="left-panel">
+                    <div class="stats-area">
+                        <div id="res-container" class="res-badge res-plat">
+                            RÉSISTANCE : <span id="res-text">PLAT</span>
+                        </div>
+
+                        <div class="timer-circle">
+                            <svg width="160" height="160" id="svg-timer">
+                                <circle id="bg-circle" stroke="#1e293b" stroke-width="6" fill="transparent" r="74" cx="80" cy="80" />
+                                <circle id="progress-circle" stroke="#3b82f6" stroke-width="6" stroke-dasharray="465" stroke-dashoffset="465" stroke-linecap="round" fill="transparent" r="74" cx="80" cy="80" style="transition: stroke-dashoffset 0.35s; transform: rotate(-90deg); transform-origin: center;"/>
+                            </svg>
+                            <div class="timer-display">
+                                <span id="timer" class="digital-font" style="font-size: 2.2rem;">00:00</span>
+                                <span id="total-remaining-display" style="color: var(--primary-hover); font-size: 0.65rem; font-weight: bold; margin-top: 2px;">TOTAL: --:--</span>
+                            </div>
+                        </div>
+
+                        <div class="dash-grid">
+                            <div class="dash-item">
+                                <span style="font-size: 0.55rem; color: var(--text-muted); text-transform: uppercase;">RPM</span>
+                                <div style="display: flex; align-items: baseline;">
+                                    <span id="target-rpm" style="font-size: 1.4rem; font-weight: 900;">80</span>
+                                </div>
+                            </div>
+                            <div class="dash-item">
+                                <span style="font-size: 0.55rem; color: var(--text-muted); text-transform: uppercase;">Pos</span>
+                                <div id="position-icon" style="font-size: 1rem; margin: 2px 0;">🪑</div>
+                                <span id="position-text" style="font-size: 0.55rem; font-weight: bold; text-transform: uppercase;">Assis</span>
+                            </div>
+                            <div class="dash-item">
+                                <span style="font-size: 0.55rem; color: var(--text-muted); text-transform: uppercase;">kcal</span>
+                                <div style="display: flex; align-items: baseline;">
+                                    <span id="live-calories" style="font-size: 1.4rem; font-weight: 900; color: var(--warning);">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Contrôles intégrés à gauche en paysage -->
+                    <div class="controls-bar">
+                        <button onclick="requestQuit()" style="background: none; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; color: white;">
+                            <div style="background: #1e293b; padding: 0.4rem; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; margin-bottom: 2px;">✖</div>
+                            <span style="font-size: 0.45rem; color: var(--text-muted); font-weight: bold;">QUITTER</span>
+                        </button>
+                        <button id="play-pause-btn" onclick="togglePause()" class="pulse" style="background: var(--primary); border: none; width: 50px; height: 50px; border-radius: 50%; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">
+                            <span id="pause-icon">❚❚</span>
+                            <span id="play-icon" class="hidden">▶</span>
+                        </button>
+                        <div style="width: 32px;"></div>
+                    </div>
+                </div>
+
+                <!-- PANNEAU DROIT (Liste) -->
+                <div class="right-panel">
+                    <div class="program-list custom-scroll" id="interactive-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ECRAN FINISH -->
+        <div id="finish-screen" class="screen hidden" style="text-align: center; justify-content: center;">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">🏆</div>
+            <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Bravo !</h2>
+            <div style="background: #1e293b; padding: 1rem; border-radius: 1rem; border: 1px solid #334155; margin-bottom: 1.5rem;">
+                <div style="color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase;">Énergie Brûlée</div>
+                <div style="font-size: 2.5rem; font-weight: 900; color: var(--warning);"><span id="final-calories">0</span> kcal</div>
+            </div>
+            <button class="btn-start" onclick="resetApp()">RETOUR</button>
+        </div>
+
+    </div>
+
+    <script>
+        let currentWorkout = [];
+        let currentStepIndex = 0;
+        let timeRemaining = 0;
+        let isPaused = false;
+        let timerInterval = null;
+        let selectedDuration = 0;
+        let selectedDifficulty = '';
+        
+        let userWeight = 70;
+        let totalCalories = 0;
+
+        const synth = window.speechSynthesis;
+
+        const basePatterns = [
+            { id: 'climb', name: "Montée de Col", duration: 180, rpm: 70, position: "Debout", icon: "🚵", res: "Grosse côte", met: 12.5 },
+            { id: 'flat', name: "Plat Rapide", duration: 60, rpm: 100, position: "Assis", icon: "🪑", res: "Plat", met: 8.5 },
+            { id: 'sprint', name: "Sprint Final", duration: 30, rpm: 115, position: "Assis", icon: "⚡", res: "Plat", met: 14 },
+            { id: 'steep', name: "Mur Escarpé", duration: 90, rpm: 60, position: "Debout", icon: "⛰️", res: "Grosse côte", met: 13 },
+            { id: 'recup', name: "Récup Active", duration: 60, rpm: 85, position: "Assis", icon: "🪑", res: "Plat", met: 7 },
+            { id: 'tt', name: "Contre-la-montre", duration: 180, rpm: 95, position: "Assis", icon: "⏱️", res: "Légère côte", met: 10 }
+        ];
+
+        function speak(text) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'fr-FR';
+            utterance.rate = 1.1;
+            synth.speak(utterance);
+        }
+
+        function speakImmediate(text) {
+            if (synth.speaking) synth.cancel();
+            speak(text);
+        }
+
+        function generateWorkout(duration, difficulty) {
+            const workout = [];
+            let rpmMod = 0;
+            let durationMod = 1;
+            
+            if (difficulty === 'beginner') { rpmMod = -10; durationMod = 0.8; }
+            else if (difficulty === 'advanced') { rpmMod = +10; durationMod = 1.2; }
+
+            const warmUpTime = Math.floor(duration * 0.15) * 60;
+            workout.push({ name: "Échauffement", duration: warmUpTime, rpm: 75 + rpmMod, position: "Assis", icon: "🪑", res: "Plat", met: 6 });
+
+            const workLimit = (duration * 60) - warmUpTime - 300; 
+            let elapsed = 0;
+
+            while (elapsed < workLimit) {
+                let pool = basePatterns.filter(p => (difficulty === 'beginner' ? p.res !== "Grosse côte" : true));
+                let p = {...pool[Math.floor(Math.random() * pool.length)]};
+                p.rpm += rpmMod;
+                p.duration = Math.floor(p.duration * durationMod);
+                
+                const actDur = Math.min(p.duration, workLimit - elapsed);
+                if (actDur > 0) {
+                    workout.push({...p, duration: actDur});
+                    elapsed += actDur;
+                }
+                
+                const recup = difficulty === 'beginner' ? 60 : 45;
+                const actRecup = Math.min(recup, workLimit - elapsed);
+                if (actRecup > 15) {
+                    workout.push({ name: "Transition", duration: actRecup, rpm: 80 + rpmMod, position: "Assis", icon: "🪑", res: "Plat", met: 7 });
+                    elapsed += actRecup;
+                }
+            }
+            workout.push({ name: "Retour au calme", duration: 300, rpm: 70 + rpmMod, position: "Assis", icon: "🧘", res: "Plat", met: 5 });
+            return workout;
+        }
+
+        function selectDuration(mins) {
+            userWeight = parseFloat(document.getElementById('user-weight').value) || 70;
+            selectedDuration = mins;
+            document.getElementById('duration-screen').classList.add('hidden');
+            document.getElementById('difficulty-screen').classList.remove('hidden');
+        }
+
+        function selectDifficulty(level) {
+            selectedDifficulty = level;
+            currentWorkout = generateWorkout(selectedDuration, selectedDifficulty);
+            document.getElementById('difficulty-screen').classList.add('hidden');
+            document.getElementById('preview-screen').classList.remove('hidden');
+            
+            const list = document.getElementById('preview-list');
+            list.innerHTML = '';
+            currentWorkout.forEach(step => {
+                const item = document.createElement('div');
+                item.className = "step-item";
+                item.style.backgroundColor = "rgba(255,255,255,0.03)";
+                item.innerHTML = `
+                    <div style="font-size: 1.5rem;">${step.icon}</div>
+                    <div style="flex: 1;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: bold;">
+                            <span>${step.name}</span><span>${formatTime(step.duration)}</span>
+                        </div>
+                    </div>`;
+                list.appendChild(item);
+            });
+        }
+
+        function startWorkout() {
+            document.getElementById('preview-screen').classList.add('hidden');
+            document.getElementById('workout-screen').classList.remove('hidden');
+            
+            const iList = document.getElementById('interactive-list');
+            iList.innerHTML = '';
+            currentWorkout.forEach((step, idx) => {
+                const item = document.createElement('div');
+                item.id = `step-${idx}`;
+                item.className = "step-item";
+                item.onclick = () => { currentStepIndex = idx; startStep(); };
+                item.innerHTML = `
+                    <div style="font-size: 1.1rem;">${step.icon}</div>
+                    <div style="flex: 1;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.7rem; font-weight: bold;">
+                            <span>${step.name}</span><span>${formatTime(step.duration)}</span>
+                        </div>
+                    </div>`;
+                iList.appendChild(item);
+            });
+            currentStepIndex = 0;
+            totalCalories = 0;
+            startStep();
+        }
+
+        function startStep() {
+            const step = currentWorkout[currentStepIndex];
+            if (!step) return;
+            timeRemaining = step.duration;
+            speakImmediate(`${step.name}. ${step.rpm} RPM. Résistance ${step.res}.`);
+            updateUI();
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (!isPaused) {
+                    timeRemaining--;
+                    const met = step.met || 8;
+                    totalCalories += (met * userWeight * (1 / 3600));
+                    updateUI();
+                    if (timeRemaining === 10) speak("Dix secondes");
+                    else if (timeRemaining > 0 && timeRemaining <= 5) speak(timeRemaining.toString());
+                    if (timeRemaining <= 0) {
+                        currentStepIndex++;
+                        if (currentStepIndex < currentWorkout.length) startStep();
+                        else finishWorkout();
+                    }
+                }
+            }, 1000);
+        }
+
+        function safeSetText(id, txt) {
+            const el = document.getElementById(id);
+            if (el) el.innerText = txt;
+        }
+
+        function updateUI() {
+            const step = currentWorkout[currentStepIndex];
+            if (!step) return;
+            safeSetText('phase-name', step.name);
+            safeSetText('target-rpm', step.rpm);
+            safeSetText('position-text', step.position);
+            safeSetText('position-icon', step.icon);
+            safeSetText('timer', formatTime(timeRemaining));
+            safeSetText('live-calories', Math.floor(totalCalories));
+            
+            let total = timeRemaining;
+            for(let i = currentStepIndex + 1; i < currentWorkout.length; i++) total += currentWorkout[i].duration;
+            safeSetText('total-remaining-display', `TOTAL: ${formatTime(total)}`);
+
+            const resCont = document.getElementById('res-container');
+            if (resCont) {
+                safeSetText('res-text', step.res);
+                resCont.className = "res-badge " + (step.res === "Plat" ? "res-plat" : (step.res === "Légère côte" ? "res-cote-l" : "res-cote-g"));
+            }
+
+            const circle = document.getElementById('progress-circle');
+            if (circle) {
+                // Détection dynamique de la circonférence pour supporter les changements paysage/portrait
+                const r = circle.getAttribute('r');
+                const circumference = 2 * Math.PI * r;
+                circle.style.strokeDasharray = circumference;
+                circle.style.strokeDashoffset = circumference - (timeRemaining / step.duration) * circumference;
+            }
+
+            currentWorkout.forEach((_, i) => {
+                const el = document.getElementById(`step-${i}`);
+                if (el) {
+                    el.className = "step-item " + (i === currentStepIndex ? "active-step" : (i < currentStepIndex ? "opacity-40" : ""));
+                    if (i === currentStepIndex) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            });
+        }
+
+        function formatTime(s) {
+            return `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
+        }
+
+        function togglePause() {
+            isPaused = !isPaused;
+            document.getElementById('play-icon').classList.toggle('hidden', !isPaused);
+            document.getElementById('pause-icon').classList.toggle('hidden', isPaused);
+            if (isPaused) synth.cancel();
+        }
+
+        function requestQuit() { isPaused = true; document.getElementById('quit-modal').classList.remove('hidden'); synth.cancel(); }
+        function closeQuitModal() { document.getElementById('quit-modal').classList.add('hidden'); isPaused = false; }
+        function confirmQuit() { resetApp(); }
+
+        function resetApp() {
+            clearInterval(timerInterval); synth.cancel();
+            ['quit-modal', 'workout-screen', 'finish-screen', 'preview-screen', 'difficulty-screen'].forEach(id => {
+                const el = document.getElementById(id); if(el) el.classList.add('hidden');
+            });
+            document.getElementById('duration-screen').classList.remove('hidden');
+        }
+
+        function finishWorkout() {
+            clearInterval(timerInterval);
+            document.getElementById('workout-screen').classList.add('hidden');
+            document.getElementById('finish-screen').classList.remove('hidden');
+            safeSetText('final-calories', Math.floor(totalCalories));
+            speakImmediate("Bravo ! Séance terminée.");
+        }
+    </script>
+</body>
+</html>
