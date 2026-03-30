@@ -2,8 +2,8 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RPM Coach Pro - Landscape Mode</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>RPM & Muscu Coach Pro</title>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -16,12 +16,14 @@
             --danger: #ef4444;
             --success: #10b981;
             --warning: #f59e0b;
+            --accent: #8b5cf6;
         }
 
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
@@ -33,29 +35,25 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 0;
+            overflow: hidden; /* Empêche le rebond de la page entière */
         }
 
         #app {
             position: relative;
             width: 100%;
-            max-width: 450px;
-            height: 100vh; /* Utilise toute la hauteur sur mobile */
-            max-height: 850px;
+            max-width: 500px;
+            height: 100vh;
+            max-height: 100vh;
             background-color: #0f172a;
-            border-radius: 1.5rem;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-            border: 1px solid #334155;
-            overflow: hidden;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
 
-        /* Responsive : sur les écrans larges ou en paysage, on élargit le conteneur */
         @media (orientation: landscape) {
             #app {
-                max-width: 95%;
-                max-height: 95vh;
+                max-width: 100%;
             }
         }
 
@@ -71,11 +69,12 @@
             overflow-y: auto;
             display: flex;
             flex-direction: column;
+            -webkit-overflow-scrolling: touch;
         }
 
         .hidden { display: none !important; }
 
-        /* Boutons */
+        /* Style des boutons de sélection */
         .btn-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -93,31 +92,29 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            text-align: center;
         }
 
-        .btn-choice:hover {
-            background-color: var(--primary);
-            transform: scale(1.05);
-        }
-
-        .btn-choice span:first-child { font-size: 1.25rem; font-weight: bold; }
-        .btn-choice span:last-child { font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); margin-top: 0.4rem; }
+        .btn-choice:hover { background-color: var(--primary); transform: translateY(-2px); }
+        .btn-choice.accent:hover { background-color: var(--accent); }
 
         .btn-start {
             width: 100%;
             background-color: var(--primary);
             color: white;
             border: none;
-            padding: 1rem;
+            padding: 1.2rem;
             border-radius: 0.75rem;
             font-weight: bold;
+            font-size: 1rem;
             cursor: pointer;
             box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
             margin-top: 1rem;
+            text-transform: uppercase;
         }
 
         .input-group {
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
             background: #1e293b;
             padding: 1rem;
             border-radius: 1rem;
@@ -126,7 +123,7 @@
 
         .input-group label {
             display: block;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             text-transform: uppercase;
             color: var(--text-muted);
             margin-bottom: 0.5rem;
@@ -138,77 +135,32 @@
             border: none;
             border-bottom: 2px solid var(--primary);
             color: white;
-            font-size: 1.5rem;
+            font-size: 1.8rem;
             font-weight: bold;
             outline: none;
             text-align: center;
         }
 
-        #quit-modal {
-            position: absolute;
-            inset: 0;
-            z-index: 100;
-            background-color: rgba(2, 6, 23, 0.95);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 1.5rem;
-        }
-
-        .modal-content {
-            background-color: #1e293b;
-            border: 1px solid #334155;
-            padding: 2rem;
-            border-radius: 1rem;
-            text-align: center;
-        }
-
-        .modal-btns {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-            margin-top: 1.5rem;
-        }
-
-        /* --- Workout Interface --- */
+        /* --- Interface Workout --- */
         .workout-header {
             background-color: var(--primary);
             padding: 0.75rem;
             text-align: center;
-            z-index: 10;
+            flex-shrink: 0;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3);
         }
 
-        .phase-title {
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            font-weight: bold;
-            font-size: 0.9rem;
-        }
-
-        /* Le conteneur qui va switcher en paysage */
         .workout-layout {
             display: flex;
             flex-direction: column;
             flex: 1;
-            overflow: hidden;
+            min-height: 0; /* Important pour permettre le scroll du fils */
         }
 
         @media (orientation: landscape) {
-            .workout-layout {
-                flex-direction: row;
-            }
-            .left-panel {
-                width: 50%;
-                border-right: 1px solid #334155;
-                display: flex;
-                flex-direction: column;
-                overflow-y: auto;
-            }
-            .right-panel {
-                width: 50%;
-                display: flex;
-                flex-direction: column;
-            }
+            .workout-layout { flex-direction: row; }
+            .left-panel { width: 45%; border-right: 1px solid #334155; overflow-y: auto; display: flex; flex-direction: column; }
+            .right-panel { width: 55%; min-height: 0; display: flex; flex-direction: column; }
         }
 
         .stats-area {
@@ -220,56 +172,26 @@
             flex-shrink: 0;
         }
 
-        .res-badge {
-            padding: 0.25rem 0.75rem;
-            border-radius: 9999px;
-            font-size: 0.65rem;
-            font-weight: bold;
-            text-transform: uppercase;
+        .exercise-img {
+            width: 100%;
+            max-width: 300px;
+            height: 140px;
+            object-fit: cover;
+            border-radius: 1rem;
+            border: 2px solid #334155;
             margin-bottom: 0.75rem;
-            border: 1px solid transparent;
         }
-
-        .res-plat { background-color: rgba(16, 185, 129, 0.2); color: #10b981; border-color: rgba(16, 185, 129, 0.3); }
-        .res-cote-l { background-color: rgba(245, 158, 11, 0.2); color: #f59e0b; border-color: rgba(245, 158, 11, 0.3); }
-        .res-cote-g { background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border-color: rgba(239, 68, 68, 0.3); }
 
         .timer-circle {
             position: relative;
-            width: 160px;
-            height: 160px;
+            width: 130px;
+            height: 130px;
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
-        /* En paysage on réduit le cercle pour gagner de la place verticale */
-        @media (orientation: landscape) {
-            .timer-circle {
-                width: 130px;
-                height: 130px;
-            }
-            .timer-circle svg {
-                width: 130px;
-                height: 130px;
-            }
-            .timer-circle circle {
-                r: 60;
-                cx: 65;
-                cy: 65;
-            }
-            #progress-circle {
-                stroke-dasharray: 377; /* 2 * PI * 60 */
-                stroke-dashoffset: 377;
-            }
-        }
-
-        .timer-display {
-            position: absolute;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
+        .timer-display { position: absolute; text-align: center; }
 
         .dash-grid {
             display: grid;
@@ -277,41 +199,47 @@
             width: 100%;
             border-top: 1px solid #334155;
             border-bottom: 1px solid #334155;
-            background-color: rgba(15, 23, 42, 0.5);
+            background-color: rgba(15, 23, 42, 0.8);
         }
 
-        .dash-item {
-            padding: 0.75rem 0.25rem;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            border-right: 1px solid #334155;
-        }
-
+        .dash-item { padding: 0.6rem 0.2rem; display: flex; flex-direction: column; align-items: center; border-right: 1px solid #334155; }
         .dash-item:last-child { border-right: none; }
 
-        .controls-bar {
-            padding: 0.75rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #020617;
-            border-top: 1px solid #334155;
-        }
-
+        /* --- Liste Interactive avec Scrollbar Visible --- */
         .program-list {
             flex: 1;
-            background-color: rgba(2, 6, 23, 0.5);
-            overflow-y: auto;
+            overflow-y: scroll; /* Force la barre pour certains navigateurs */
+            background-color: #020617;
             padding: 1rem;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+        }
+
+        /* Personnalisation de la Scrollbar (Chrome, Safari, Edge) */
+        .program-list::-webkit-scrollbar {
+            width: 10px; /* Plus large pour être attrapée au doigt */
+        }
+
+        .program-list::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+
+        .program-list::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 10px;
+            border: 2px solid #0f172a;
+        }
+
+        .program-list::-webkit-scrollbar-thumb:hover {
+            background: var(--primary);
         }
 
         .step-item {
-            background-color: rgba(30, 41, 59, 0.5);
-            border: 1px solid #334155;
+            background-color: #1e293b;
+            border: 2px solid transparent;
             border-radius: 0.75rem;
             padding: 0.75rem;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.6rem;
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -321,11 +249,32 @@
 
         .step-item.active-step {
             border-color: var(--primary);
-            background-color: rgba(37, 99, 235, 0.1);
+            background-color: rgba(37, 99, 235, 0.2);
+            transform: scale(1.02);
+            z-index: 5;
         }
 
-        .custom-scroll::-webkit-scrollbar { width: 4px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        .step-item img { width: 45px; height: 45px; border-radius: 0.5rem; object-fit: cover; }
+
+        .controls-bar {
+            padding: 0.5rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #020617;
+            border-top: 1px solid #334155;
+            flex-shrink: 0;
+        }
+
+        #quit-modal {
+            position: absolute;
+            inset: 0;
+            z-index: 100;
+            background-color: rgba(2, 6, 23, 0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
 
         .pulse { animation: pulse-anim 2s infinite; }
         @keyframes pulse-anim {
@@ -337,29 +286,41 @@
 <body>
 
     <div id="app">
-        
         <!-- MODAL QUITTER -->
         <div id="quit-modal" class="hidden">
-            <div class="modal-content">
-                <h3 style="margin-bottom: 0.5rem;">Abandonner ?</h3>
-                <p style="color: var(--text-muted); font-size: 0.8rem;">La progression sera perdue.</p>
-                <div class="modal-btns">
-                    <button onclick="confirmQuit()" style="background: var(--danger); color: white; border: none; padding: 0.75rem; border-radius: 0.5rem; font-weight: bold; cursor: pointer;">OUI, ARRÊTER</button>
-                    <button onclick="closeQuitModal()" style="background: #334155; color: white; border: none; padding: 0.75rem; border-radius: 0.5rem; font-weight: bold; cursor: pointer;">CONTINUER</button>
+            <div style="background: #1e293b; padding: 2rem; border-radius: 1rem; text-align: center; border: 1px solid #334155; width: 80%;">
+                <h3 style="margin-bottom: 1.5rem;">Arrêter la séance ?</h3>
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <button onclick="confirmQuit()" style="background: var(--danger); color: white; border: none; padding: 1rem; border-radius: 0.5rem; font-weight: bold;">QUITTER DÉFINITIVEMENT</button>
+                    <button onclick="closeQuitModal()" style="background: #334155; color: white; border: none; padding: 1rem; border-radius: 0.5rem; font-weight: bold;">CONTINUER</button>
                 </div>
             </div>
         </div>
 
-        <!-- ECRAN DUREE -->
-        <div id="duration-screen" class="screen">
-            <h1 style="color: var(--primary); font-size: 2rem; margin-bottom: 0.5rem;">RPM Coach</h1>
-            <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Étape 1 : Profil et durée</p>
-            
-            <div class="input-group">
-                <label for="user-weight">Votre poids (kg)</label>
-                <input type="number" id="user-weight" value="70" min="30" max="200">
+        <!-- ECRAN 0 : TYPE ACTIVITÉ -->
+        <div id="activity-screen" class="screen">
+            <h1 style="color: var(--primary); font-size: 2rem; margin-bottom: 0.5rem;">Coach Pro</h1>
+            <p style="color: var(--text-muted); margin-bottom: 2rem;">Quel est l'objectif ?</p>
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                <button class="btn-choice" onclick="selectActivity('rpm')" style="flex-direction:row; gap:1rem; width:100%; text-align:left;">
+                    <span style="font-size: 2.5rem;">🚴</span>
+                    <div><b>Cardio RPM</b><div style="font-size:0.6rem">Endurance & Calories</div></div>
+                </button>
+                <button class="btn-choice accent" onclick="selectActivity('muscu')" style="flex-direction:row; gap:1rem; width:100%; text-align:left;">
+                    <span style="font-size: 2.5rem;">💪</span>
+                    <div><b>Musculation</b><div style="font-size:0.6rem">Force & Tonification</div></div>
+                </button>
             </div>
+        </div>
 
+        <!-- ECRAN 1 : DURÉE -->
+        <div id="duration-screen" class="screen hidden">
+            <button onclick="resetApp()" style="background:none; border:none; color:var(--primary); margin-bottom:1rem; font-weight:bold;">← RETOUR</button>
+            <h1>Paramètres</h1>
+            <div class="input-group">
+                <label>Votre poids (kg)</label>
+                <input type="number" id="user-weight" value="70">
+            </div>
             <div class="btn-grid">
                 <button class="btn-choice" onclick="selectDuration(20)"><span>20</span><span>Min</span></button>
                 <button class="btn-choice" onclick="selectDuration(30)"><span>30</span><span>Min</span></button>
@@ -368,349 +329,255 @@
             </div>
         </div>
 
-        <!-- ECRAN NIVEAU -->
+        <!-- ECRAN 2a : NIVEAU (RPM) -->
         <div id="difficulty-screen" class="screen hidden">
-            <button onclick="resetApp()" style="background: none; border: none; color: var(--primary); cursor: pointer; text-align: left; margin-bottom: 1rem; font-weight: bold;">← RETOUR</button>
-            <h1 style="font-size: 2rem; margin-bottom: 1rem;">Intensité</h1>
-            <div style="display: flex; flex-direction: column; gap: 1rem;">
-                <button class="btn-choice" style="flex-direction: row; gap: 1rem; width: 100%; align-items: center; text-align: left;" onclick="selectDifficulty('beginner')">
-                    <span style="font-size: 1.5rem;">🌱</span>
-                    <div>
-                        <div style="color: var(--success); font-weight: bold;">Débutant</div>
-                        <div style="font-size: 0.6rem; color: var(--text-muted);">Reprise douce / Initiation</div>
-                    </div>
-                </button>
-                <button class="btn-choice" style="flex-direction: row; gap: 1rem; width: 100%; align-items: center; text-align: left;" onclick="selectDifficulty('intermediate')">
-                    <span style="font-size: 1.5rem;">🚴</span>
-                    <div>
-                        <div style="color: var(--primary-hover); font-weight: bold;">Intermédiaire</div>
-                        <div style="font-size: 0.6rem; color: var(--text-muted);">Endurance et puissance</div>
-                    </div>
-                </button>
-                <button class="btn-choice" style="flex-direction: row; gap: 1rem; width: 100%; align-items: center; text-align: left;" onclick="selectDifficulty('advanced')">
-                    <span style="font-size: 1.5rem;">🔥</span>
-                    <div>
-                        <div style="color: var(--danger); font-weight: bold;">Confirmé</div>
-                        <div style="font-size: 0.6rem; color: var(--text-muted);">Cadences et dénivelés forts</div>
-                    </div>
-                </button>
+            <button onclick="backToDuration()" style="background:none; border:none; color:var(--primary); margin-bottom:1rem; font-weight:bold;">← RETOUR</button>
+            <h1>Intensité RPM</h1>
+            <div style="display:flex; flex-direction:column; gap:1rem; margin-top:1rem;">
+                <button class="btn-choice" onclick="generateProgram('beginner')"><span>🌱</span><b>DÉBUTANT</b></button>
+                <button class="btn-choice" onclick="generateProgram('intermediate')"><span>🚴</span><b>INTERMÉDIAIRE</b></button>
+                <button class="btn-choice" onclick="generateProgram('advanced')"><span>🔥</span><b>CONFIRMÉ</b></button>
+            </div>
+        </div>
+
+        <!-- ECRAN 2b : EQUIPEMENT (MUSCU) -->
+        <div id="equipment-screen" class="screen hidden">
+            <button onclick="backToDuration()" style="background:none; border:none; color:var(--accent); margin-bottom:1rem; font-weight:bold;">← RETOUR</button>
+            <h1>Équipement</h1>
+            <div style="display:flex; flex-direction:column; gap:1rem; margin-top:1rem;">
+                <button class="btn-choice accent" onclick="selectEquipment('bodyweight')"><span>🤸</span><b>POIDS DU CORPS</b></button>
+                <button class="btn-choice accent" onclick="selectEquipment('gym')"><span>🏋️</span><b>MATÉRIEL (SALLE)</b></button>
+            </div>
+        </div>
+
+        <!-- ECRAN 2c : ZONE CORPS (MUSCU) -->
+        <div id="body-part-screen" class="screen hidden">
+            <button onclick="document.getElementById('body-part-screen').classList.add('hidden'); document.getElementById('equipment-screen').classList.remove('hidden');" style="background:none; border:none; color:var(--accent); margin-bottom:1rem; font-weight:bold;">← RETOUR</button>
+            <h1>Cible</h1>
+            <div style="display:flex; flex-direction:column; gap:1rem; margin-top:1rem;">
+                <button class="btn-choice accent" onclick="generateProgram('upper')"><span>👕</span><b>HAUT DU CORPS</b></button>
+                <button class="btn-choice accent" onclick="generateProgram('lower')"><span>🩳</span><b>BAS DU CORPS</b></button>
+                <button class="btn-choice accent" onclick="generateProgram('fullbody')"><span>⚡</span><b>CORPS COMPLET</b></button>
             </div>
         </div>
 
         <!-- ECRAN PREVIEW -->
         <div id="preview-screen" class="screen hidden">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <h2 style="font-size: 1.25rem;">Votre Séance</h2>
-                <button onclick="resetApp()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.7rem; font-weight: bold;">ANNULER</button>
-            </div>
-            <div id="preview-list" class="custom-scroll" style="flex: 1; overflow-y: auto; margin-bottom: 1rem;"></div>
-            <button class="btn-start" onclick="startWorkout()">DÉMARRER LA SESSION</button>
+            <h2>Programme de la session</h2>
+            <div id="preview-list" class="program-list" style="margin-top:1rem;"></div>
+            <button class="btn-start" id="start-btn-final" onclick="startWorkout()">DÉMARRER LA SÉANCE</button>
         </div>
 
         <!-- ECRAN WORKOUT -->
         <div id="workout-screen" class="hidden h-full flex flex-col">
-            <div class="workout-header">
-                <span id="phase-name" class="phase-title">ÉCHAUFFEMENT</span>
-            </div>
-
+            <div id="workout-bar" class="workout-header"><span id="phase-name" class="phase-title">PRÉPARATION</span></div>
             <div class="workout-layout">
-                <!-- PANNEAU GAUCHE (Stats) -->
                 <div class="left-panel">
                     <div class="stats-area">
-                        <div id="res-container" class="res-badge res-plat">
-                            RÉSISTANCE : <span id="res-text">PLAT</span>
-                        </div>
-
+                        <img id="main-exercise-img" src="" class="exercise-img" onerror="this.style.display='none'">
+                        <div id="res-container" class="res-badge"><span id="res-label">INFO</span> : <span id="res-text">--</span></div>
                         <div class="timer-circle">
-                            <svg width="160" height="160" id="svg-timer">
-                                <circle id="bg-circle" stroke="#1e293b" stroke-width="6" fill="transparent" r="74" cx="80" cy="80" />
-                                <circle id="progress-circle" stroke="#3b82f6" stroke-width="6" stroke-dasharray="465" stroke-dashoffset="465" stroke-linecap="round" fill="transparent" r="74" cx="80" cy="80" style="transition: stroke-dashoffset 0.35s; transform: rotate(-90deg); transform-origin: center;"/>
+                            <svg width="130" height="130">
+                                <circle stroke="#1e293b" stroke-width="4" fill="transparent" r="60" cx="65" cy="65" />
+                                <circle id="progress-circle" stroke="#3b82f6" stroke-width="4" stroke-dasharray="377" stroke-dashoffset="377" stroke-linecap="round" fill="transparent" r="60" cx="65" cy="65" style="transition: stroke-dashoffset 0.3s; transform: rotate(-90deg); transform-origin: center;"/>
                             </svg>
                             <div class="timer-display">
-                                <span id="timer" class="digital-font" style="font-size: 2.2rem;">00:00</span>
-                                <span id="total-remaining-display" style="color: var(--primary-hover); font-size: 0.65rem; font-weight: bold; margin-top: 2px;">TOTAL: --:--</span>
+                                <span id="timer" class="digital-font" style="font-size: 2rem;">00:00</span>
+                                <span id="total-remaining-display" style="color:var(--primary-hover); font-size:0.6rem; font-weight:bold;">T: --:--</span>
                             </div>
                         </div>
-
                         <div class="dash-grid">
-                            <div class="dash-item">
-                                <span style="font-size: 0.55rem; color: var(--text-muted); text-transform: uppercase;">RPM</span>
-                                <div style="display: flex; align-items: baseline;">
-                                    <span id="target-rpm" style="font-size: 1.4rem; font-weight: 900;">80</span>
-                                </div>
-                            </div>
-                            <div class="dash-item">
-                                <span style="font-size: 0.55rem; color: var(--text-muted); text-transform: uppercase;">Pos</span>
-                                <div id="position-icon" style="font-size: 1rem; margin: 2px 0;">🪑</div>
-                                <span id="position-text" style="font-size: 0.55rem; font-weight: bold; text-transform: uppercase;">Assis</span>
-                            </div>
-                            <div class="dash-item">
-                                <span style="font-size: 0.55rem; color: var(--text-muted); text-transform: uppercase;">kcal</span>
-                                <div style="display: flex; align-items: baseline;">
-                                    <span id="live-calories" style="font-size: 1.4rem; font-weight: 900; color: var(--warning);">0</span>
-                                </div>
-                            </div>
+                            <div class="dash-item"><span id="dash-label-1" style="font-size:0.45rem; color:var(--text-muted);">RPM</span><span id="dash-val-1" style="font-size:1.2rem; font-weight:900;">--</span></div>
+                            <div class="dash-item"><span id="dash-label-2" style="font-size:0.45rem; color:var(--text-muted);">CIBLE</span><span id="dash-val-2" style="font-size:0.5rem; font-weight:bold;">--</span></div>
+                            <div class="dash-item"><span style="font-size:0.45rem; color:var(--text-muted);">KCAL</span><span id="live-calories" style="font-size:1.2rem; font-weight:900; color:var(--warning);">0</span></div>
                         </div>
                     </div>
-
-                    <!-- Contrôles intégrés à gauche en paysage -->
                     <div class="controls-bar">
-                        <button onclick="requestQuit()" style="background: none; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; color: white;">
-                            <div style="background: #1e293b; padding: 0.4rem; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; margin-bottom: 2px;">✖</div>
-                            <span style="font-size: 0.45rem; color: var(--text-muted); font-weight: bold;">QUITTER</span>
-                        </button>
-                        <button id="play-pause-btn" onclick="togglePause()" class="pulse" style="background: var(--primary); border: none; width: 50px; height: 50px; border-radius: 50%; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">
-                            <span id="pause-icon">❚❚</span>
-                            <span id="play-icon" class="hidden">▶</span>
-                        </button>
-                        <div style="width: 32px;"></div>
+                        <button onclick="requestQuit()" style="background:none; border:none; color:white; font-size:0.5rem;"><b>ARRÊTER</b></button>
+                        <button id="play-pause-btn" onclick="togglePause()" class="pulse" style="background:var(--primary); border:none; width:50px; height:50px; border-radius:50%; color:white; cursor:pointer;"><b>||</b></button>
+                        <div style="width:30px;"></div>
                     </div>
                 </div>
-
-                <!-- PANNEAU DROIT (Liste) -->
                 <div class="right-panel">
-                    <div class="program-list custom-scroll" id="interactive-list"></div>
+                    <div class="program-list" id="interactive-list">
+                        <!-- Les étapes cliquables s'affichent ici -->
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- ECRAN FINISH -->
-        <div id="finish-screen" class="screen hidden" style="text-align: center; justify-content: center;">
-            <div style="font-size: 3rem; margin-bottom: 1rem;">🏆</div>
-            <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Bravo !</h2>
-            <div style="background: #1e293b; padding: 1rem; border-radius: 1rem; border: 1px solid #334155; margin-bottom: 1.5rem;">
-                <div style="color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase;">Énergie Brûlée</div>
-                <div style="font-size: 2.5rem; font-weight: 900; color: var(--warning);"><span id="final-calories">0</span> kcal</div>
+        <!-- ECRAN FIN -->
+        <div id="finish-screen" class="screen hidden" style="text-align:center; justify-content:center;">
+            <div style="font-size:4rem;">🏆</div>
+            <h2>Félicitations !</h2>
+            <div style="background:#1e293b; padding:1.5rem; border-radius:1rem; margin:1.5rem 0;">
+                <div style="font-size:2.5rem; font-weight:900; color:var(--warning);"><span id="final-calories">0</span> kcal</div>
             </div>
-            <button class="btn-start" onclick="resetApp()">RETOUR</button>
+            <button class="btn-start" onclick="resetApp()">ACCUEIL</button>
         </div>
-
     </div>
 
     <script>
-        let currentWorkout = [];
-        let currentStepIndex = 0;
-        let timeRemaining = 0;
-        let isPaused = false;
-        let timerInterval = null;
-        let selectedDuration = 0;
-        let selectedDifficulty = '';
-        
-        let userWeight = 70;
-        let totalCalories = 0;
-
+        let selectedActivity = 'rpm', selectedDuration = 20, selectedEquipment = 'bodyweight';
+        let currentWorkout = [], currentStepIndex = 0, timeRemaining = 0, totalCalories = 0;
+        let isPaused = false, timerInterval = null, userWeight = 70;
         const synth = window.speechSynthesis;
 
-        const basePatterns = [
-            { id: 'climb', name: "Montée de Col", duration: 180, rpm: 70, position: "Debout", icon: "🚵", res: "Grosse côte", met: 12.5 },
-            { id: 'flat', name: "Plat Rapide", duration: 60, rpm: 100, position: "Assis", icon: "🪑", res: "Plat", met: 8.5 },
-            { id: 'sprint', name: "Sprint Final", duration: 30, rpm: 115, position: "Assis", icon: "⚡", res: "Plat", met: 14 },
-            { id: 'steep', name: "Mur Escarpé", duration: 90, rpm: 60, position: "Debout", icon: "⛰️", res: "Grosse côte", met: 13 },
-            { id: 'recup', name: "Récup Active", duration: 60, rpm: 85, position: "Assis", icon: "🪑", res: "Plat", met: 7 },
-            { id: 'tt', name: "Contre-la-montre", duration: 180, rpm: 95, position: "Assis", icon: "⏱️", res: "Légère côte", met: 10 }
+        const MUSCLES = {
+            chest: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=500&q=80',
+            back: 'https://images.unsplash.com/photo-1605296867304-46d5465a13f1?w=500&q=80',
+            abs: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500&q=80',
+            legs: 'https://images.unsplash.com/photo-1434608519344-49d77a699e1d?w=500&q=80',
+            glutes: 'https://images.unsplash.com/photo-1590239068512-63276724bab0?w=500&q=80',
+            shoulders: 'https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?w=500&q=80',
+            arms: 'https://images.unsplash.com/photo-1530822847156-5df684ec5ee1?w=500&q=80',
+            warmup: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=500&q=80',
+            rest: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=500&q=80'
+        };
+
+        const MUSCU_DATA = {
+            bodyweight: {
+                upper: [{name:"Pompes", target:"Pectoraux", img:MUSCLES.chest, met:8}, {name:"Dips", target:"Triceps", img:MUSCLES.arms, met:7}, {name:"Superman", target:"Lombaires", img:MUSCLES.back, met:4}],
+                lower: [{name:"Squats", target:"Cuisses", img:MUSCLES.legs, met:8}, {name:"Fentes", target:"Jambes", img:MUSCLES.legs, met:7}, {name:"Pont fessier", target:"Fessiers", img:MUSCLES.glutes, met:5}],
+                fullbody: [{name:"Burpees", target:"Cardio/Complet", img:MUSCLES.warmup, met:14}, {name:"Climbers", target:"Abdominaux", img:MUSCLES.abs, met:10}, {name:"Jumping Jacks", target:"Cardio", img:MUSCLES.warmup, met:9}]
+            },
+            gym: {
+                upper: [{name:"Dév. Couché", target:"Pecs", img:MUSCLES.chest, met:9}, {name:"Tirage Dos", target:"Dorsaux", img:MUSCLES.back, met:8}, {name:"Dév. Militaire", target:"Épaules", img:MUSCLES.shoulders, met:8}],
+                lower: [{name:"Presse", target:"Quadriceps", img:MUSCLES.legs, met:9}, {name:"Squat Barre", target:"Cuisses", img:MUSCLES.legs, met:10}, {name:"SDT", target:"Ischios", img:MUSCLES.back, met:12}],
+                fullbody: [{name:"KB Swing", target:"Chaîne Post.", img:MUSCLES.glutes, met:12}, {name:"Thrusters", target:"Épaules/Jambes", img:MUSCLES.shoulders, met:13}, {name:"Renegade Row", target:"Dos/Core", img:MUSCLES.back, met:10}]
+            }
+        };
+
+        const RPM_DATA = [
+            {name:"Plat Rapide", rpm:100, res:"Plat", target:"Vitesse", img:MUSCLES.legs, met:9},
+            {name:"Montée de Col", rpm:70, res:"Grosse côte", target:"Force", img:MUSCLES.legs, met:12},
+            {name:"Sprint Final", rpm:115, res:"Légère côte", target:"Puissance", img:MUSCLES.legs, met:15},
+            {name:"Récup active", rpm:85, res:"Plat", target:"Souffle", img:MUSCLES.warmup, met:7}
         ];
 
-        function speak(text) {
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'fr-FR';
-            utterance.rate = 1.1;
-            synth.speak(utterance);
-        }
+        function speak(t) { const u = new SpeechSynthesisUtterance(t); u.lang='fr-FR'; u.rate=1.1; synth.speak(u); }
+        function speakImmediate(t) { synth.cancel(); speak(t); }
 
-        function speakImmediate(text) {
-            if (synth.speaking) synth.cancel();
-            speak(text);
-        }
+        function selectActivity(a) { selectedActivity=a; document.getElementById('activity-screen').classList.add('hidden'); document.getElementById('duration-screen').classList.remove('hidden'); }
+        function selectDuration(d) { selectedDuration=d; userWeight=parseFloat(document.getElementById('user-weight').value)||70; document.getElementById('duration-screen').classList.add('hidden'); if(selectedActivity==='rpm') document.getElementById('difficulty-screen').classList.remove('hidden'); else document.getElementById('equipment-screen').classList.remove('hidden'); }
+        function selectEquipment(e) { selectedEquipment=e; document.getElementById('equipment-screen').classList.add('hidden'); document.getElementById('body-part-screen').classList.remove('hidden'); }
+        function backToDuration() { document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden')); document.getElementById('duration-screen').classList.remove('hidden'); }
 
-        function generateWorkout(duration, difficulty) {
-            const workout = [];
-            let rpmMod = 0;
-            let durationMod = 1;
-            
-            if (difficulty === 'beginner') { rpmMod = -10; durationMod = 0.8; }
-            else if (difficulty === 'advanced') { rpmMod = +10; durationMod = 1.2; }
-
-            const warmUpTime = Math.floor(duration * 0.15) * 60;
-            workout.push({ name: "Échauffement", duration: warmUpTime, rpm: 75 + rpmMod, position: "Assis", icon: "🪑", res: "Plat", met: 6 });
-
-            const workLimit = (duration * 60) - warmUpTime - 300; 
-            let elapsed = 0;
-
-            while (elapsed < workLimit) {
-                let pool = basePatterns.filter(p => (difficulty === 'beginner' ? p.res !== "Grosse côte" : true));
-                let p = {...pool[Math.floor(Math.random() * pool.length)]};
-                p.rpm += rpmMod;
-                p.duration = Math.floor(p.duration * durationMod);
-                
-                const actDur = Math.min(p.duration, workLimit - elapsed);
-                if (actDur > 0) {
-                    workout.push({...p, duration: actDur});
-                    elapsed += actDur;
+        function generateProgram(opt) {
+            currentWorkout = []; let elapsed = 0; const totalSec = selectedDuration * 60;
+            if(selectedActivity==='rpm') {
+                let mod = (opt==='beginner')?-10:(opt==='advanced')?10:0;
+                currentWorkout.push({name:"Échauffement", duration:180, rpm:75+mod, res:"Plat", target:"Mobilisation", img:MUSCLES.warmup, met:6});
+                elapsed = 180;
+                while(elapsed < totalSec - 180) {
+                    let p = {...RPM_DATA[Math.floor(Math.random()*RPM_DATA.length)]}; p.rpm += mod;
+                    let dur = Math.min(120, totalSec - 180 - elapsed);
+                    currentWorkout.push({...p, duration:dur}); elapsed += dur;
                 }
-                
-                const recup = difficulty === 'beginner' ? 60 : 45;
-                const actRecup = Math.min(recup, workLimit - elapsed);
-                if (actRecup > 15) {
-                    workout.push({ name: "Transition", duration: actRecup, rpm: 80 + rpmMod, position: "Assis", icon: "🪑", res: "Plat", met: 7 });
-                    elapsed += actRecup;
+                currentWorkout.push({name:"Retour au calme", duration:180, rpm:70+mod, res:"Plat", target:"Récup", img:MUSCLES.warmup, met:5});
+            } else {
+                const pool = MUSCU_DATA[selectedEquipment][opt];
+                currentWorkout.push({name:"Échauffement", duration:180, target:"Articulations", res:"Mobilisation", img:MUSCLES.warmup, met:4});
+                elapsed = 180;
+                while(elapsed < totalSec - 120) {
+                    let ex = {...pool[Math.floor(Math.random()*pool.length)]};
+                    currentWorkout.push({...ex, duration:45, isRest:false, res:"TRAVAIL"}); elapsed += 45;
+                    if(elapsed < totalSec - 120) { currentWorkout.push({name:"Repos", duration:15, isRest:true, res:"REPOS", img:MUSCLES.rest, target:"Oxygène", met:2}); elapsed += 15; }
                 }
+                currentWorkout.push({name:"Étirements", duration:120, target:"Souplesse", res:"Fin", img:MUSCLES.rest, met:3});
             }
-            workout.push({ name: "Retour au calme", duration: 300, rpm: 70 + rpmMod, position: "Assis", icon: "🧘", res: "Plat", met: 5 });
-            return workout;
+            showPreview();
         }
 
-        function selectDuration(mins) {
-            userWeight = parseFloat(document.getElementById('user-weight').value) || 70;
-            selectedDuration = mins;
-            document.getElementById('duration-screen').classList.add('hidden');
-            document.getElementById('difficulty-screen').classList.remove('hidden');
-        }
-
-        function selectDifficulty(level) {
-            selectedDifficulty = level;
-            currentWorkout = generateWorkout(selectedDuration, selectedDifficulty);
-            document.getElementById('difficulty-screen').classList.add('hidden');
+        function showPreview() {
+            document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
             document.getElementById('preview-screen').classList.remove('hidden');
-            
-            const list = document.getElementById('preview-list');
-            list.innerHTML = '';
-            currentWorkout.forEach(step => {
-                const item = document.createElement('div');
-                item.className = "step-item";
-                item.style.backgroundColor = "rgba(255,255,255,0.03)";
-                item.innerHTML = `
-                    <div style="font-size: 1.5rem;">${step.icon}</div>
-                    <div style="flex: 1;">
-                        <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: bold;">
-                            <span>${step.name}</span><span>${formatTime(step.duration)}</span>
-                        </div>
-                    </div>`;
-                list.appendChild(item);
+            const list = document.getElementById('preview-list'); list.innerHTML = '';
+            currentWorkout.forEach(s => {
+                list.innerHTML += `<div class="step-item"><img src="${s.img}"><div><b>${s.name}</b><div style="font-size:0.6rem">${formatTime(s.duration)} | ${s.target}</div></div></div>`;
             });
         }
 
         function startWorkout() {
             document.getElementById('preview-screen').classList.add('hidden');
             document.getElementById('workout-screen').classList.remove('hidden');
-            
-            const iList = document.getElementById('interactive-list');
-            iList.innerHTML = '';
-            currentWorkout.forEach((step, idx) => {
-                const item = document.createElement('div');
-                item.id = `step-${idx}`;
-                item.className = "step-item";
-                item.onclick = () => { currentStepIndex = idx; startStep(); };
-                item.innerHTML = `
-                    <div style="font-size: 1.1rem;">${step.icon}</div>
-                    <div style="flex: 1;">
-                        <div style="display: flex; justify-content: space-between; font-size: 0.7rem; font-weight: bold;">
-                            <span>${step.name}</span><span>${formatTime(step.duration)}</span>
-                        </div>
-                    </div>`;
-                iList.appendChild(item);
+            const list = document.getElementById('interactive-list'); list.innerHTML = '';
+            currentWorkout.forEach((s, i) => {
+                const item = document.createElement('div'); item.className = "step-item"; item.id = `step-${i}`;
+                item.onclick = () => jumpToStep(i);
+                item.innerHTML = `<img src="${s.img}"><div><b>${s.name}</b><div style="font-size:0.6rem">${formatTime(s.duration)}</div></div>`;
+                list.appendChild(item);
             });
-            currentStepIndex = 0;
-            totalCalories = 0;
-            startStep();
+            currentStepIndex = 0; totalCalories = 0; isPaused = false; startStep();
         }
 
+        function jumpToStep(idx) { currentStepIndex = idx; isPaused = false; startStep(); }
+
         function startStep() {
-            const step = currentWorkout[currentStepIndex];
-            if (!step) return;
-            timeRemaining = step.duration;
-            speakImmediate(`${step.name}. ${step.rpm} RPM. Résistance ${step.res}.`);
+            const s = currentWorkout[currentStepIndex]; if(!s) return;
+            timeRemaining = s.duration;
+            speakImmediate(selectedActivity==='rpm' ? `${s.name}. ${s.rpm} RPM.` : (s.isRest?"Repos":`Exercice : ${s.name}`));
             updateUI();
-            if (timerInterval) clearInterval(timerInterval);
+            if(timerInterval) clearInterval(timerInterval);
             timerInterval = setInterval(() => {
-                if (!isPaused) {
-                    timeRemaining--;
-                    const met = step.met || 8;
-                    totalCalories += (met * userWeight * (1 / 3600));
+                if(!isPaused) {
+                    timeRemaining--; totalCalories += ((s.met||7) * userWeight * (1/3600));
                     updateUI();
-                    if (timeRemaining === 10) speak("Dix secondes");
-                    else if (timeRemaining > 0 && timeRemaining <= 5) speak(timeRemaining.toString());
-                    if (timeRemaining <= 0) {
-                        currentStepIndex++;
-                        if (currentStepIndex < currentWorkout.length) startStep();
-                        else finishWorkout();
-                    }
+                    if(timeRemaining === 10) speak("Dix secondes");
+                    else if(timeRemaining > 0 && timeRemaining <= 5) speak(timeRemaining.toString());
+                    if(timeRemaining <= 0) { currentStepIndex++; if(currentStepIndex < currentWorkout.length) startStep(); else finishWorkout(); }
                 }
             }, 1000);
         }
 
-        function safeSetText(id, txt) {
-            const el = document.getElementById(id);
-            if (el) el.innerText = txt;
-        }
-
         function updateUI() {
-            const step = currentWorkout[currentStepIndex];
-            if (!step) return;
-            safeSetText('phase-name', step.name);
-            safeSetText('target-rpm', step.rpm);
-            safeSetText('position-text', step.position);
-            safeSetText('position-icon', step.icon);
-            safeSetText('timer', formatTime(timeRemaining));
-            safeSetText('live-calories', Math.floor(totalCalories));
+            const s = currentWorkout[currentStepIndex]; if(!s) return;
+            document.getElementById('phase-name').innerText = s.name;
+            document.getElementById('timer').innerText = formatTime(timeRemaining);
+            document.getElementById('live-calories').innerText = Math.floor(totalCalories);
+            document.getElementById('main-exercise-img').src = s.img;
+            document.getElementById('res-text').innerText = s.res.toUpperCase();
             
-            let total = timeRemaining;
-            for(let i = currentStepIndex + 1; i < currentWorkout.length; i++) total += currentWorkout[i].duration;
-            safeSetText('total-remaining-display', `TOTAL: ${formatTime(total)}`);
+            let total = timeRemaining; for(let i=currentStepIndex+1; i<currentWorkout.length; i++) total += currentWorkout[i].duration;
+            document.getElementById('total-remaining-display').innerText = `T: ${formatTime(total)}`;
 
-            const resCont = document.getElementById('res-container');
-            if (resCont) {
-                safeSetText('res-text', step.res);
-                resCont.className = "res-badge " + (step.res === "Plat" ? "res-plat" : (step.res === "Légère côte" ? "res-cote-l" : "res-cote-g"));
+            if(selectedActivity==='rpm') {
+                document.getElementById('dash-val-1').innerText = s.rpm;
+                document.getElementById('dash-val-2').innerText = s.target;
+            } else {
+                document.getElementById('dash-val-1').innerText = formatTime(timeRemaining);
+                const next = currentWorkout[currentStepIndex+1];
+                document.getElementById('dash-val-2').innerText = next ? (next.isRest?"Repos":next.target) : "Fin";
             }
 
-            const circle = document.getElementById('progress-circle');
-            if (circle) {
-                // Détection dynamique de la circonférence pour supporter les changements paysage/portrait
-                const r = circle.getAttribute('r');
-                const circumference = 2 * Math.PI * r;
-                circle.style.strokeDasharray = circumference;
-                circle.style.strokeDashoffset = circumference - (timeRemaining / step.duration) * circumference;
-            }
+            const circ = 377;
+            document.getElementById('progress-circle').style.strokeDashoffset = circ - (timeRemaining/s.duration)*circ;
 
+            // Navigation visuelle et auto-scroll
             currentWorkout.forEach((_, i) => {
                 const el = document.getElementById(`step-${i}`);
-                if (el) {
-                    el.className = "step-item " + (i === currentStepIndex ? "active-step" : (i < currentStepIndex ? "opacity-40" : ""));
-                    if (i === currentStepIndex) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                if(el) {
+                    el.className = "step-item " + (i===currentStepIndex?"active-step":(i<currentStepIndex?"opacity-30":""));
+                    if(i===currentStepIndex) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
             });
         }
 
-        function formatTime(s) {
-            return `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
-        }
-
-        function togglePause() {
-            isPaused = !isPaused;
-            document.getElementById('play-icon').classList.toggle('hidden', !isPaused);
-            document.getElementById('pause-icon').classList.toggle('hidden', isPaused);
-            if (isPaused) synth.cancel();
-        }
-
-        function requestQuit() { isPaused = true; document.getElementById('quit-modal').classList.remove('hidden'); synth.cancel(); }
-        function closeQuitModal() { document.getElementById('quit-modal').classList.add('hidden'); isPaused = false; }
+        function formatTime(s) { return `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`; }
+        function togglePause() { isPaused = !isPaused; synth.cancel(); }
+        function requestQuit() { isPaused=true; document.getElementById('quit-modal').classList.remove('hidden'); }
+        function closeQuitModal() { document.getElementById('quit-modal').classList.add('hidden'); isPaused=false; }
         function confirmQuit() { resetApp(); }
-
-        function resetApp() {
-            clearInterval(timerInterval); synth.cancel();
-            ['quit-modal', 'workout-screen', 'finish-screen', 'preview-screen', 'difficulty-screen'].forEach(id => {
-                const el = document.getElementById(id); if(el) el.classList.add('hidden');
-            });
-            document.getElementById('duration-screen').classList.remove('hidden');
-        }
+        function resetApp() { location.reload(); }
 
         function finishWorkout() {
             clearInterval(timerInterval);
             document.getElementById('workout-screen').classList.add('hidden');
             document.getElementById('finish-screen').classList.remove('hidden');
-            safeSetText('final-calories', Math.floor(totalCalories));
-            speakImmediate("Bravo ! Séance terminée.");
+            document.getElementById('final-calories').innerText = Math.floor(totalCalories);
+            speakImmediate("Séance terminée ! Bravo.");
         }
     </script>
 </body>
 </html>
+
