@@ -6,578 +6,488 @@
     <title>RPM & Muscu Coach Pro</title>
     <style>
         :root {
-            --bg-color: #0f172a;
-            --card-bg: #1e293b;
-            --primary: #2563eb;
-            --primary-hover: #3b82f6;
-            --text-main: #ffffff;
-            --text-muted: #94a3b8;
-            --text-dark: #64748b;
-            --danger: #ef4444;
-            --success: #10b981;
-            --warning: #f59e0b;
-            --accent: #8b5cf6;
+            --bg: #0f172a; --card: #1e293b; --primary: #2563eb; --primary-h: #3b82f6;
+            --text: #ffffff; --muted: #94a3b8; --danger: #ef4444; --warning: #f59e0b;
+            --accent: #8b5cf6; --border: #334155;
         }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            -webkit-tap-highlight-color: transparent;
-        }
-
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden; /* Empêche le rebond de la page entière */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg); color: var(--text);
+            min-height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden;
         }
-
         #app {
-            position: relative;
-            width: 100%;
-            max-width: 500px;
+            position: relative; width: 100%; max-width: 500px;
+            height: 100vh; background: var(--bg);
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        @media (orientation: landscape) { #app { max-width: 100%; } }
+
+        .screen {
+            padding: 1.5rem; flex: 1; overflow-y: auto;
+            display: flex; flex-direction: column; -webkit-overflow-scrolling: touch;
+        }
+        .hidden { display: none !important; }
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .btn-choice {
+            background: var(--card); border: 1px solid var(--border); border-radius: 1rem;
+            padding: 1.25rem; color: white; cursor: pointer; transition: all 0.2s;
+            display: flex; flex-direction: column; align-items: center; text-align: center;
+        }
+        .btn-choice:hover { background: var(--primary); transform: translateY(-2px); }
+        .btn-choice.accent:hover { background: var(--accent); }
+        .btn-start {
+            width: 100%; background: var(--primary); color: white; border: none;
+            padding: 1.2rem; border-radius: 0.75rem; font-weight: bold; font-size: 1rem;
+            cursor: pointer; margin-top: 1rem; text-transform: uppercase;
+        }
+        .input-group {
+            margin-bottom: 1.5rem; background: var(--card);
+            padding: 1rem; border-radius: 1rem; border: 1px solid var(--border);
+        }
+        .input-group label { display: block; font-size: 0.7rem; text-transform: uppercase; color: var(--muted); margin-bottom: 0.5rem; }
+        .input-group input { width: 100%; background: transparent; border: none; border-bottom: 2px solid var(--primary); color: white; font-size: 1.8rem; font-weight: bold; outline: none; text-align: center; }
+
+        /* ======================== WORKOUT SCREEN ======================== */
+        /* Structure : barre fixe en haut, puis workout-body en dessous */
+        #workout-screen {
             height: 100vh;
-            max-height: 100vh;
-            background-color: #0f172a;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
             display: flex;
             flex-direction: column;
             overflow: hidden;
         }
-
+        #workout-bar {
+            background: var(--primary); padding: 0.6rem 1rem; text-align: center;
+            font-weight: bold; font-size: 0.9rem; letter-spacing: 0.05em; flex-shrink: 0;
+        }
+        /* workout-body occupe tout l'espace restant */
+        #workout-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column; /* portrait: empilé */
+            overflow: hidden;
+            min-height: 0;
+        }
+        /* paysage: côte à côte */
         @media (orientation: landscape) {
-            #app {
-                max-width: 100%;
-            }
+            #workout-body { flex-direction: row; }
+            #left-col { width: 300px; flex-shrink: 0; border-right: 1px solid var(--border); }
         }
 
-        .digital-font {
-            font-family: "Courier New", Courier, monospace;
-            font-weight: bold;
-            letter-spacing: -2px;
+        /* Panneau gauche = chrono + contrôles */
+        #left-col {
+            display: flex; flex-direction: column;
+            background: #020617; flex-shrink: 0;
         }
+        #timer-zone {
+            padding: 0.6rem 1rem; flex-shrink: 0;
+            display: flex; align-items: center; gap: 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .timer-svg-wrap { position: relative; width: 70px; height: 70px; flex-shrink: 0; }
+        .timer-svg-wrap svg { width: 70px; height: 70px; }
+        .timer-overlay {
+            position: absolute; inset: 0;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .timer-overlay #timer { font-family: "Courier New", monospace; font-weight: bold; font-size: 1rem; letter-spacing: -1px; }
+        .timer-overlay #total-rem { font-size: 0.45rem; color: var(--primary-h); font-weight: bold; }
+        .timer-meta { flex: 1; min-width: 0; }
+        .timer-meta .phase-big { font-weight: bold; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .timer-meta .phase-sub { font-size: 0.62rem; color: var(--muted); margin-top: 2px; }
+        .timer-meta .phase-next { font-size: 0.6rem; color: var(--warning); margin-top: 3px; }
+        .timer-stats { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+        .stat-pill { background: var(--card); border-radius: 0.4rem; padding: 0.15rem 0.5rem; font-size: 0.65rem; font-weight: bold; white-space: nowrap; }
+        .stat-pill span { color: var(--muted); font-weight: normal; margin-right: 3px; }
 
-        .screen {
-            padding: 1.5rem;
+        #controls-mini {
+            padding: 0.4rem 1rem; display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid var(--border); flex-shrink: 0;
+        }
+        #controls-mini button { background: none; border: none; color: var(--text); cursor: pointer; font-size: 0.7rem; font-weight: bold; padding: 0.3rem 0.5rem; }
+        #play-pause-btn {
+            background: var(--primary) !important; width: 40px !important; height: 40px !important;
+            border-radius: 50% !important; display: flex !important; align-items: center; justify-content: center;
+        }
+        .pulse { animation: pulse-anim 2s infinite; }
+        @keyframes pulse-anim { 0%{box-shadow:0 0 0 0 rgba(37,99,235,.4)} 100%{box-shadow:0 0 0 12px rgba(37,99,235,0)} }
+
+        /* Panneau droit = liste scrollable, prend tout l'espace restant */
+        #steps-panel {
             flex: 1;
             overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            -webkit-overflow-scrolling: touch;
-        }
-
-        .hidden { display: none !important; }
-
-        /* Style des boutons de sélection */
-        .btn-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-        }
-
-        .btn-choice {
-            background-color: #1e293b;
-            border: 1px solid #334155;
-            border-radius: 1rem;
-            padding: 1.25rem;
-            color: white;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-        }
-
-        .btn-choice:hover { background-color: var(--primary); transform: translateY(-2px); }
-        .btn-choice.accent:hover { background-color: var(--accent); }
-
-        .btn-start {
-            width: 100%;
-            background-color: var(--primary);
-            color: white;
-            border: none;
-            padding: 1.2rem;
-            border-radius: 0.75rem;
-            font-weight: bold;
-            font-size: 1rem;
-            cursor: pointer;
-            box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
-            margin-top: 1rem;
-            text-transform: uppercase;
-        }
-
-        .input-group {
-            margin-bottom: 1.5rem;
-            background: #1e293b;
-            padding: 1rem;
-            border-radius: 1rem;
-            border: 1px solid #334155;
-        }
-
-        .input-group label {
-            display: block;
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            color: var(--text-muted);
-            margin-bottom: 0.5rem;
-        }
-
-        .input-group input {
-            width: 100%;
-            background: transparent;
-            border: none;
-            border-bottom: 2px solid var(--primary);
-            color: white;
-            font-size: 1.8rem;
-            font-weight: bold;
-            outline: none;
-            text-align: center;
-        }
-
-        /* --- Interface Workout --- */
-        .workout-header {
-            background-color: var(--primary);
             padding: 0.75rem;
-            text-align: center;
-            flex-shrink: 0;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3);
-        }
-
-        .workout-layout {
-            display: flex;
-            flex-direction: column;
-            flex: 1;
-            min-height: 0; /* Important pour permettre le scroll du fils */
-        }
-
-        @media (orientation: landscape) {
-            .workout-layout { flex-direction: row; }
-            .left-panel { width: 45%; border-right: 1px solid #334155; overflow-y: auto; display: flex; flex-direction: column; }
-            .right-panel { width: 55%; min-height: 0; display: flex; flex-direction: column; }
-        }
-
-        .stats-area {
-            background-color: #0f172a;
-            padding: 1rem 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            flex-shrink: 0;
-        }
-
-        .exercise-img {
-            width: 100%;
-            max-width: 300px;
-            height: 140px;
-            object-fit: cover;
-            border-radius: 1rem;
-            border: 2px solid #334155;
-            margin-bottom: 0.75rem;
-        }
-
-        .timer-circle {
-            position: relative;
-            width: 130px;
-            height: 130px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .timer-display { position: absolute; text-align: center; }
-
-        .dash-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            width: 100%;
-            border-top: 1px solid #334155;
-            border-bottom: 1px solid #334155;
-            background-color: rgba(15, 23, 42, 0.8);
-        }
-
-        .dash-item { padding: 0.6rem 0.2rem; display: flex; flex-direction: column; align-items: center; border-right: 1px solid #334155; }
-        .dash-item:last-child { border-right: none; }
-
-        /* --- Liste Interactive avec Scrollbar Visible --- */
-        .program-list {
-            flex: 1;
-            overflow-y: scroll; /* Force la barre pour certains navigateurs */
-            background-color: #020617;
-            padding: 1rem;
             -webkit-overflow-scrolling: touch;
             overscroll-behavior: contain;
-        }
-
-        /* Personnalisation de la Scrollbar (Chrome, Safari, Edge) */
-        .program-list::-webkit-scrollbar {
-            width: 10px; /* Plus large pour être attrapée au doigt */
-        }
-
-        .program-list::-webkit-scrollbar-track {
-            background: #0f172a;
-        }
-
-        .program-list::-webkit-scrollbar-thumb {
-            background: #334155;
-            border-radius: 10px;
-            border: 2px solid #0f172a;
-        }
-
-        .program-list::-webkit-scrollbar-thumb:hover {
-            background: var(--primary);
-        }
-
-        .step-item {
-            background-color: #1e293b;
-            border: 2px solid transparent;
-            border-radius: 0.75rem;
-            padding: 0.75rem;
-            margin-bottom: 0.6rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            transition: all 0.2s;
-        }
-
-        .step-item.active-step {
-            border-color: var(--primary);
-            background-color: rgba(37, 99, 235, 0.2);
-            transform: scale(1.02);
-            z-index: 5;
-        }
-
-        .step-item img { width: 45px; height: 45px; border-radius: 0.5rem; object-fit: cover; }
-
-        .controls-bar {
-            padding: 0.5rem 1rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
             background: #020617;
-            border-top: 1px solid #334155;
-            flex-shrink: 0;
+            min-height: 0;
         }
+        #steps-panel::-webkit-scrollbar { width: 8px; }
+        #steps-panel::-webkit-scrollbar-track { background: #0f172a; }
+        #steps-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+        #steps-panel::-webkit-scrollbar-thumb:hover { background: var(--primary); }
 
+        /* Step items */
+        .step-item {
+            background: var(--card); border: 2px solid transparent; border-radius: 0.75rem;
+            padding: 0.65rem 0.75rem; margin-bottom: 0.5rem; cursor: pointer;
+            display: flex; align-items: center; gap: 0.65rem;
+            transition: all 0.15s; user-select: none;
+        }
+        .step-item:active { opacity: 0.8; }
+        .step-item img { width: 42px; height: 42px; border-radius: 0.5rem; object-fit: cover; flex-shrink: 0; }
+        .step-item .step-info { flex: 1; min-width: 0; }
+        .step-item .step-info b { font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+        .step-item .step-info .step-sub { font-size: 0.6rem; color: var(--muted); margin-top: 2px; }
+        .step-item .step-num { font-size: 0.6rem; color: var(--muted); flex-shrink: 0; width: 18px; text-align: center; }
+        .step-item.active-step { border-color: var(--primary); background: rgba(37,99,235,.2); }
+        .step-item.done-step { opacity: 0.35; }
+        .step-item:not(.active-step):not(.done-step):hover { background: #2d3748; }
+        .step-jump-btn {
+            background: var(--primary); border: none; border-radius: 0.4rem;
+            color: white; font-size: 0.55rem; font-weight: bold; padding: 0.25rem 0.5rem;
+            cursor: pointer; flex-shrink: 0; opacity: 0; transition: opacity 0.15s;
+        }
+        .step-item:hover .step-jump-btn { opacity: 1; }
+        .step-item.active-step .step-jump-btn { display: none; }
+
+        .program-list {
+            flex: 1; overflow-y: auto; background: #020617; padding: 1rem;
+            border-radius: 0.75rem; -webkit-overflow-scrolling: touch;
+        }
         #quit-modal {
-            position: absolute;
-            inset: 0;
-            z-index: 100;
-            background-color: rgba(2, 6, 23, 0.95);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .pulse { animation: pulse-anim 2s infinite; }
-        @keyframes pulse-anim {
-            0% { box-shadow: 0 0 0 0px rgba(37, 99, 235, 0.4); }
-            100% { box-shadow: 0 0 0 15px rgba(37, 99, 235, 0); }
+            position: absolute; inset: 0; z-index: 100;
+            background: rgba(2,6,23,.95); display: flex; align-items: center; justify-content: center;
         }
     </style>
 </head>
 <body>
+<div id="app">
 
-    <div id="app">
-        <!-- MODAL QUITTER -->
-        <div id="quit-modal" class="hidden">
-            <div style="background: #1e293b; padding: 2rem; border-radius: 1rem; text-align: center; border: 1px solid #334155; width: 80%;">
-                <h3 style="margin-bottom: 1.5rem;">Arrêter la séance ?</h3>
-                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                    <button onclick="confirmQuit()" style="background: var(--danger); color: white; border: none; padding: 1rem; border-radius: 0.5rem; font-weight: bold;">QUITTER DÉFINITIVEMENT</button>
-                    <button onclick="closeQuitModal()" style="background: #334155; color: white; border: none; padding: 1rem; border-radius: 0.5rem; font-weight: bold;">CONTINUER</button>
-                </div>
+    <!-- MODAL QUITTER -->
+    <div id="quit-modal" class="hidden">
+        <div style="background:var(--card);padding:2rem;border-radius:1rem;text-align:center;border:1px solid var(--border);width:80%;">
+            <h3 style="margin-bottom:1.5rem;">Arrêter la séance ?</h3>
+            <div style="display:flex;flex-direction:column;gap:.75rem;">
+                <button onclick="confirmQuit()" style="background:var(--danger);color:white;border:none;padding:1rem;border-radius:.5rem;font-weight:bold;">QUITTER DÉFINITIVEMENT</button>
+                <button onclick="closeQuitModal()" style="background:#334155;color:white;border:none;padding:1rem;border-radius:.5rem;font-weight:bold;">CONTINUER</button>
             </div>
-        </div>
-
-        <!-- ECRAN 0 : TYPE ACTIVITÉ -->
-        <div id="activity-screen" class="screen">
-            <h1 style="color: var(--primary); font-size: 2rem; margin-bottom: 0.5rem;">Coach Pro</h1>
-            <p style="color: var(--text-muted); margin-bottom: 2rem;">Quel est l'objectif ?</p>
-            <div style="display: flex; flex-direction: column; gap: 1rem;">
-                <button class="btn-choice" onclick="selectActivity('rpm')" style="flex-direction:row; gap:1rem; width:100%; text-align:left;">
-                    <span style="font-size: 2.5rem;">🚴</span>
-                    <div><b>Cardio RPM</b><div style="font-size:0.6rem">Endurance & Calories</div></div>
-                </button>
-                <button class="btn-choice accent" onclick="selectActivity('muscu')" style="flex-direction:row; gap:1rem; width:100%; text-align:left;">
-                    <span style="font-size: 2.5rem;">💪</span>
-                    <div><b>Musculation</b><div style="font-size:0.6rem">Force & Tonification</div></div>
-                </button>
-            </div>
-        </div>
-
-        <!-- ECRAN 1 : DURÉE -->
-        <div id="duration-screen" class="screen hidden">
-            <button onclick="resetApp()" style="background:none; border:none; color:var(--primary); margin-bottom:1rem; font-weight:bold;">← RETOUR</button>
-            <h1>Paramètres</h1>
-            <div class="input-group">
-                <label>Votre poids (kg)</label>
-                <input type="number" id="user-weight" value="70">
-            </div>
-            <div class="btn-grid">
-                <button class="btn-choice" onclick="selectDuration(20)"><span>20</span><span>Min</span></button>
-                <button class="btn-choice" onclick="selectDuration(30)"><span>30</span><span>Min</span></button>
-                <button class="btn-choice" onclick="selectDuration(45)"><span>45</span><span>Min</span></button>
-                <button class="btn-choice" onclick="selectDuration(60)"><span>60</span><span>Min</span></button>
-            </div>
-        </div>
-
-        <!-- ECRAN 2a : NIVEAU (RPM) -->
-        <div id="difficulty-screen" class="screen hidden">
-            <button onclick="backToDuration()" style="background:none; border:none; color:var(--primary); margin-bottom:1rem; font-weight:bold;">← RETOUR</button>
-            <h1>Intensité RPM</h1>
-            <div style="display:flex; flex-direction:column; gap:1rem; margin-top:1rem;">
-                <button class="btn-choice" onclick="generateProgram('beginner')"><span>🌱</span><b>DÉBUTANT</b></button>
-                <button class="btn-choice" onclick="generateProgram('intermediate')"><span>🚴</span><b>INTERMÉDIAIRE</b></button>
-                <button class="btn-choice" onclick="generateProgram('advanced')"><span>🔥</span><b>CONFIRMÉ</b></button>
-            </div>
-        </div>
-
-        <!-- ECRAN 2b : EQUIPEMENT (MUSCU) -->
-        <div id="equipment-screen" class="screen hidden">
-            <button onclick="backToDuration()" style="background:none; border:none; color:var(--accent); margin-bottom:1rem; font-weight:bold;">← RETOUR</button>
-            <h1>Équipement</h1>
-            <div style="display:flex; flex-direction:column; gap:1rem; margin-top:1rem;">
-                <button class="btn-choice accent" onclick="selectEquipment('bodyweight')"><span>🤸</span><b>POIDS DU CORPS</b></button>
-                <button class="btn-choice accent" onclick="selectEquipment('gym')"><span>🏋️</span><b>MATÉRIEL (SALLE)</b></button>
-            </div>
-        </div>
-
-        <!-- ECRAN 2c : ZONE CORPS (MUSCU) -->
-        <div id="body-part-screen" class="screen hidden">
-            <button onclick="document.getElementById('body-part-screen').classList.add('hidden'); document.getElementById('equipment-screen').classList.remove('hidden');" style="background:none; border:none; color:var(--accent); margin-bottom:1rem; font-weight:bold;">← RETOUR</button>
-            <h1>Cible</h1>
-            <div style="display:flex; flex-direction:column; gap:1rem; margin-top:1rem;">
-                <button class="btn-choice accent" onclick="generateProgram('upper')"><span>👕</span><b>HAUT DU CORPS</b></button>
-                <button class="btn-choice accent" onclick="generateProgram('lower')"><span>🩳</span><b>BAS DU CORPS</b></button>
-                <button class="btn-choice accent" onclick="generateProgram('fullbody')"><span>⚡</span><b>CORPS COMPLET</b></button>
-            </div>
-        </div>
-
-        <!-- ECRAN PREVIEW -->
-        <div id="preview-screen" class="screen hidden">
-            <h2>Programme de la session</h2>
-            <div id="preview-list" class="program-list" style="margin-top:1rem;"></div>
-            <button class="btn-start" id="start-btn-final" onclick="startWorkout()">DÉMARRER LA SÉANCE</button>
-        </div>
-
-        <!-- ECRAN WORKOUT -->
-        <div id="workout-screen" class="hidden h-full flex flex-col">
-            <div id="workout-bar" class="workout-header"><span id="phase-name" class="phase-title">PRÉPARATION</span></div>
-            <div class="workout-layout">
-                <div class="left-panel">
-                    <div class="stats-area">
-                        <img id="main-exercise-img" src="" class="exercise-img" onerror="this.style.display='none'">
-                        <div id="res-container" class="res-badge"><span id="res-label">INFO</span> : <span id="res-text">--</span></div>
-                        <div class="timer-circle">
-                            <svg width="130" height="130">
-                                <circle stroke="#1e293b" stroke-width="4" fill="transparent" r="60" cx="65" cy="65" />
-                                <circle id="progress-circle" stroke="#3b82f6" stroke-width="4" stroke-dasharray="377" stroke-dashoffset="377" stroke-linecap="round" fill="transparent" r="60" cx="65" cy="65" style="transition: stroke-dashoffset 0.3s; transform: rotate(-90deg); transform-origin: center;"/>
-                            </svg>
-                            <div class="timer-display">
-                                <span id="timer" class="digital-font" style="font-size: 2rem;">00:00</span>
-                                <span id="total-remaining-display" style="color:var(--primary-hover); font-size:0.6rem; font-weight:bold;">T: --:--</span>
-                            </div>
-                        </div>
-                        <div class="dash-grid">
-                            <div class="dash-item"><span id="dash-label-1" style="font-size:0.45rem; color:var(--text-muted);">RPM</span><span id="dash-val-1" style="font-size:1.2rem; font-weight:900;">--</span></div>
-                            <div class="dash-item"><span id="dash-label-2" style="font-size:0.45rem; color:var(--text-muted);">CIBLE</span><span id="dash-val-2" style="font-size:0.5rem; font-weight:bold;">--</span></div>
-                            <div class="dash-item"><span style="font-size:0.45rem; color:var(--text-muted);">KCAL</span><span id="live-calories" style="font-size:1.2rem; font-weight:900; color:var(--warning);">0</span></div>
-                        </div>
-                    </div>
-                    <div class="controls-bar">
-                        <button onclick="requestQuit()" style="background:none; border:none; color:white; font-size:0.5rem;"><b>ARRÊTER</b></button>
-                        <button id="play-pause-btn" onclick="togglePause()" class="pulse" style="background:var(--primary); border:none; width:50px; height:50px; border-radius:50%; color:white; cursor:pointer;"><b>||</b></button>
-                        <div style="width:30px;"></div>
-                    </div>
-                </div>
-                <div class="right-panel">
-                    <div class="program-list" id="interactive-list">
-                        <!-- Les étapes cliquables s'affichent ici -->
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ECRAN FIN -->
-        <div id="finish-screen" class="screen hidden" style="text-align:center; justify-content:center;">
-            <div style="font-size:4rem;">🏆</div>
-            <h2>Félicitations !</h2>
-            <div style="background:#1e293b; padding:1.5rem; border-radius:1rem; margin:1.5rem 0;">
-                <div style="font-size:2.5rem; font-weight:900; color:var(--warning);"><span id="final-calories">0</span> kcal</div>
-            </div>
-            <button class="btn-start" onclick="resetApp()">ACCUEIL</button>
         </div>
     </div>
 
-    <script>
-        let selectedActivity = 'rpm', selectedDuration = 20, selectedEquipment = 'bodyweight';
-        let currentWorkout = [], currentStepIndex = 0, timeRemaining = 0, totalCalories = 0;
-        let isPaused = false, timerInterval = null, userWeight = 70;
-        const synth = window.speechSynthesis;
+    <!-- ÉCRAN 0 : ACTIVITÉ -->
+    <div id="activity-screen" class="screen">
+        <h1 style="color:var(--primary);font-size:2rem;margin-bottom:.5rem;">Coach Pro</h1>
+        <p style="color:var(--muted);margin-bottom:2rem;">Quel est l'objectif ?</p>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <button class="btn-choice" onclick="selectActivity('rpm')" style="flex-direction:row;gap:1rem;width:100%;text-align:left;">
+                <span style="font-size:2.5rem;">🚴</span>
+                <div><b>Cardio RPM</b><div style="font-size:.6rem">Endurance & Calories</div></div>
+            </button>
+            <button class="btn-choice accent" onclick="selectActivity('muscu')" style="flex-direction:row;gap:1rem;width:100%;text-align:left;">
+                <span style="font-size:2.5rem;">💪</span>
+                <div><b>Musculation</b><div style="font-size:.6rem">Force & Tonification</div></div>
+            </button>
+        </div>
+    </div>
 
-        const MUSCLES = {
-            chest: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=500&q=80',
-            back: 'https://images.unsplash.com/photo-1605296867304-46d5465a13f1?w=500&q=80',
-            abs: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500&q=80',
-            legs: 'https://images.unsplash.com/photo-1434608519344-49d77a699e1d?w=500&q=80',
-            glutes: 'https://images.unsplash.com/photo-1590239068512-63276724bab0?w=500&q=80',
-            shoulders: 'https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?w=500&q=80',
-            arms: 'https://images.unsplash.com/photo-1530822847156-5df684ec5ee1?w=500&q=80',
-            warmup: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=500&q=80',
-            rest: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=500&q=80'
-        };
+    <!-- ÉCRAN 1 : DURÉE -->
+    <div id="duration-screen" class="screen hidden">
+        <button onclick="showOnly('activity-screen')" style="background:none;border:none;color:var(--primary);margin-bottom:1rem;font-weight:bold;">← RETOUR</button>
+        <h1>Paramètres</h1>
+        <div class="input-group">
+            <label>Votre poids (kg)</label>
+            <input type="number" id="user-weight" value="70">
+        </div>
+        <div class="btn-grid">
+            <button class="btn-choice" onclick="selectDuration(20)"><span>20</span><span>Min</span></button>
+            <button class="btn-choice" onclick="selectDuration(30)"><span>30</span><span>Min</span></button>
+            <button class="btn-choice" onclick="selectDuration(45)"><span>45</span><span>Min</span></button>
+            <button class="btn-choice" onclick="selectDuration(60)"><span>60</span><span>Min</span></button>
+        </div>
+    </div>
 
-        const MUSCU_DATA = {
-            bodyweight: {
-                upper: [{name:"Pompes", target:"Pectoraux", img:MUSCLES.chest, met:8}, {name:"Dips", target:"Triceps", img:MUSCLES.arms, met:7}, {name:"Superman", target:"Lombaires", img:MUSCLES.back, met:4}],
-                lower: [{name:"Squats", target:"Cuisses", img:MUSCLES.legs, met:8}, {name:"Fentes", target:"Jambes", img:MUSCLES.legs, met:7}, {name:"Pont fessier", target:"Fessiers", img:MUSCLES.glutes, met:5}],
-                fullbody: [{name:"Burpees", target:"Cardio/Complet", img:MUSCLES.warmup, met:14}, {name:"Climbers", target:"Abdominaux", img:MUSCLES.abs, met:10}, {name:"Jumping Jacks", target:"Cardio", img:MUSCLES.warmup, met:9}]
-            },
-            gym: {
-                upper: [{name:"Dév. Couché", target:"Pecs", img:MUSCLES.chest, met:9}, {name:"Tirage Dos", target:"Dorsaux", img:MUSCLES.back, met:8}, {name:"Dév. Militaire", target:"Épaules", img:MUSCLES.shoulders, met:8}],
-                lower: [{name:"Presse", target:"Quadriceps", img:MUSCLES.legs, met:9}, {name:"Squat Barre", target:"Cuisses", img:MUSCLES.legs, met:10}, {name:"SDT", target:"Ischios", img:MUSCLES.back, met:12}],
-                fullbody: [{name:"KB Swing", target:"Chaîne Post.", img:MUSCLES.glutes, met:12}, {name:"Thrusters", target:"Épaules/Jambes", img:MUSCLES.shoulders, met:13}, {name:"Renegade Row", target:"Dos/Core", img:MUSCLES.back, met:10}]
-            }
-        };
+    <!-- ÉCRAN 2a : NIVEAU RPM -->
+    <div id="difficulty-screen" class="screen hidden">
+        <button onclick="showOnly('duration-screen')" style="background:none;border:none;color:var(--primary);margin-bottom:1rem;font-weight:bold;">← RETOUR</button>
+        <h1>Intensité RPM</h1>
+        <div style="display:flex;flex-direction:column;gap:1rem;margin-top:1rem;">
+            <button class="btn-choice" onclick="generateProgram('beginner')"><span>🌱</span><b>DÉBUTANT</b></button>
+            <button class="btn-choice" onclick="generateProgram('intermediate')"><span>🚴</span><b>INTERMÉDIAIRE</b></button>
+            <button class="btn-choice" onclick="generateProgram('advanced')"><span>🔥</span><b>CONFIRMÉ</b></button>
+        </div>
+    </div>
 
-        const RPM_DATA = [
-            {name:"Plat Rapide", rpm:100, res:"Plat", target:"Vitesse", img:MUSCLES.legs, met:9},
-            {name:"Montée de Col", rpm:70, res:"Grosse côte", target:"Force", img:MUSCLES.legs, met:12},
-            {name:"Sprint Final", rpm:115, res:"Légère côte", target:"Puissance", img:MUSCLES.legs, met:15},
-            {name:"Récup active", rpm:85, res:"Plat", target:"Souffle", img:MUSCLES.warmup, met:7}
-        ];
+    <!-- ÉCRAN 2b : ÉQUIPEMENT -->
+    <div id="equipment-screen" class="screen hidden">
+        <button onclick="showOnly('duration-screen')" style="background:none;border:none;color:var(--accent);margin-bottom:1rem;font-weight:bold;">← RETOUR</button>
+        <h1>Équipement</h1>
+        <div style="display:flex;flex-direction:column;gap:1rem;margin-top:1rem;">
+            <button class="btn-choice accent" onclick="selectEquipment('bodyweight')"><span>🤸</span><b>POIDS DU CORPS</b></button>
+            <button class="btn-choice accent" onclick="selectEquipment('gym')"><span>🏋️</span><b>MATÉRIEL (SALLE)</b></button>
+        </div>
+    </div>
 
-        function speak(t) { const u = new SpeechSynthesisUtterance(t); u.lang='fr-FR'; u.rate=1.1; synth.speak(u); }
-        function speakImmediate(t) { synth.cancel(); speak(t); }
+    <!-- ÉCRAN 2c : ZONE CORPS -->
+    <div id="body-part-screen" class="screen hidden">
+        <button onclick="showOnly('equipment-screen')" style="background:none;border:none;color:var(--accent);margin-bottom:1rem;font-weight:bold;">← RETOUR</button>
+        <h1>Cible</h1>
+        <div style="display:flex;flex-direction:column;gap:1rem;margin-top:1rem;">
+            <button class="btn-choice accent" onclick="generateProgram('upper')"><span>👕</span><b>HAUT DU CORPS</b></button>
+            <button class="btn-choice accent" onclick="generateProgram('lower')"><span>🩳</span><b>BAS DU CORPS</b></button>
+            <button class="btn-choice accent" onclick="generateProgram('fullbody')"><span>⚡</span><b>CORPS COMPLET</b></button>
+        </div>
+    </div>
 
-        function selectActivity(a) { selectedActivity=a; document.getElementById('activity-screen').classList.add('hidden'); document.getElementById('duration-screen').classList.remove('hidden'); }
-        function selectDuration(d) { selectedDuration=d; userWeight=parseFloat(document.getElementById('user-weight').value)||70; document.getElementById('duration-screen').classList.add('hidden'); if(selectedActivity==='rpm') document.getElementById('difficulty-screen').classList.remove('hidden'); else document.getElementById('equipment-screen').classList.remove('hidden'); }
-        function selectEquipment(e) { selectedEquipment=e; document.getElementById('equipment-screen').classList.add('hidden'); document.getElementById('body-part-screen').classList.remove('hidden'); }
-        function backToDuration() { document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden')); document.getElementById('duration-screen').classList.remove('hidden'); }
+    <!-- ÉCRAN PREVIEW -->
+    <div id="preview-screen" class="screen hidden">
+        <h2>Programme de la session</h2>
+        <div id="preview-list" class="program-list" style="margin-top:1rem;"></div>
+        <button class="btn-start" onclick="startWorkout()">DÉMARRER LA SÉANCE</button>
+    </div>
 
-        function generateProgram(opt) {
-            currentWorkout = []; let elapsed = 0; const totalSec = selectedDuration * 60;
-            if(selectedActivity==='rpm') {
-                let mod = (opt==='beginner')?-10:(opt==='advanced')?10:0;
-                currentWorkout.push({name:"Échauffement", duration:180, rpm:75+mod, res:"Plat", target:"Mobilisation", img:MUSCLES.warmup, met:6});
-                elapsed = 180;
-                while(elapsed < totalSec - 180) {
-                    let p = {...RPM_DATA[Math.floor(Math.random()*RPM_DATA.length)]}; p.rpm += mod;
-                    let dur = Math.min(120, totalSec - 180 - elapsed);
-                    currentWorkout.push({...p, duration:dur}); elapsed += dur;
-                }
-                currentWorkout.push({name:"Retour au calme", duration:180, rpm:70+mod, res:"Plat", target:"Récup", img:MUSCLES.warmup, met:5});
-            } else {
-                const pool = MUSCU_DATA[selectedEquipment][opt];
-                currentWorkout.push({name:"Échauffement", duration:180, target:"Articulations", res:"Mobilisation", img:MUSCLES.warmup, met:4});
-                elapsed = 180;
-                while(elapsed < totalSec - 120) {
-                    let ex = {...pool[Math.floor(Math.random()*pool.length)]};
-                    currentWorkout.push({...ex, duration:45, isRest:false, res:"TRAVAIL"}); elapsed += 45;
-                    if(elapsed < totalSec - 120) { currentWorkout.push({name:"Repos", duration:15, isRest:true, res:"REPOS", img:MUSCLES.rest, target:"Oxygène", met:2}); elapsed += 15; }
-                }
-                currentWorkout.push({name:"Étirements", duration:120, target:"Souplesse", res:"Fin", img:MUSCLES.rest, met:3});
-            }
-            showPreview();
+    <!-- ÉCRAN WORKOUT -->
+    <div id="workout-screen" class="hidden">
+        <div id="workout-bar"><span id="phase-name">PRÉPARATION</span></div>
+
+        <div id="workout-body">
+            <!-- Colonne gauche : chrono + contrôles -->
+            <div id="left-col">
+                <div id="timer-zone">
+                    <div class="timer-svg-wrap">
+                        <svg viewBox="0 0 70 70">
+                            <circle stroke="#1e293b" stroke-width="4" fill="transparent" r="30" cx="35" cy="35"/>
+                            <circle id="progress-circle" stroke="#3b82f6" stroke-width="4"
+                                stroke-dasharray="188.5" stroke-dashoffset="188.5"
+                                stroke-linecap="round" fill="transparent" r="30" cx="35" cy="35"
+                                style="transition:stroke-dashoffset .3s;transform:rotate(-90deg);transform-origin:center;"/>
+                        </svg>
+                        <div class="timer-overlay">
+                            <span id="timer" style="font-family:'Courier New',monospace;font-weight:bold;font-size:1rem;letter-spacing:-1px;">00:00</span>
+                            <span id="total-rem" style="font-size:.45rem;color:var(--primary-h);font-weight:bold;">T: --</span>
+                        </div>
+                    </div>
+                    <div class="timer-meta">
+                        <div class="phase-big" id="phase-name-meta">--</div>
+                        <div class="phase-sub" id="phase-sub-meta">--</div>
+                        <div class="phase-next" id="next-step-preview">--</div>
+                    </div>
+                    <div class="timer-stats">
+                        <div class="stat-pill"><span>KCAL</span><span id="live-calories" style="color:var(--warning);">0</span></div>
+                        <div class="stat-pill"><span id="stat-label-1">RPM</span><span id="dash-val-1">--</span></div>
+                    </div>
+                </div>
+                <div id="controls-mini">
+                    <button onclick="requestQuit()">■ ARRÊTER</button>
+                    <button id="play-pause-btn" onclick="togglePause()" class="pulse">‖</button>
+                    <button onclick="skipStep()" style="color:var(--muted);">▶▶ SUIVANT</button>
+                </div>
+            </div>
+
+            <!-- Colonne droite : liste scrollable et cliquable -->
+            <div id="steps-panel"></div>
+        </div>
+    </div>
+
+    <!-- ÉCRAN FIN -->
+    <div id="finish-screen" class="screen hidden" style="text-align:center;justify-content:center;">
+        <div style="font-size:4rem;">🏆</div>
+        <h2>Félicitations !</h2>
+        <div style="background:var(--card);padding:1.5rem;border-radius:1rem;margin:1.5rem 0;">
+            <div style="font-size:2.5rem;font-weight:900;color:var(--warning);"><span id="final-calories">0</span> kcal</div>
+        </div>
+        <button class="btn-start" onclick="resetApp()">ACCUEIL</button>
+    </div>
+</div>
+
+<script>
+const SCREENS = ['activity-screen','duration-screen','difficulty-screen','equipment-screen','body-part-screen','preview-screen','workout-screen','finish-screen'];
+function showOnly(id) {
+    SCREENS.forEach(s => {
+        const el = document.getElementById(s);
+        if (!el) return;
+        if (s === id) { el.classList.remove('hidden'); }
+        else { el.classList.add('hidden'); }
+    });
+}
+
+let selectedActivity='rpm', selectedDuration=20, selectedEquipment='bodyweight';
+let currentWorkout=[], currentStepIndex=0, timeRemaining=0, totalCalories=0;
+let isPaused=false, timerInterval=null, userWeight=70;
+const synth=window.speechSynthesis;
+
+const MUSCLES={
+    chest:'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=500&q=80',
+    back:'https://images.unsplash.com/photo-1605296867304-46d5465a13f1?w=500&q=80',
+    abs:'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500&q=80',
+    legs:'https://images.unsplash.com/photo-1434608519344-49d77a699e1d?w=500&q=80',
+    glutes:'https://images.unsplash.com/photo-1590239068512-63276724bab0?w=500&q=80',
+    shoulders:'https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?w=500&q=80',
+    arms:'https://images.unsplash.com/photo-1530822847156-5df684ec5ee1?w=500&q=80',
+    warmup:'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=500&q=80',
+    rest:'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=500&q=80'
+};
+const MUSCU_DATA={
+    bodyweight:{
+        upper:[{name:"Pompes",target:"Pectoraux",img:MUSCLES.chest,met:8},{name:"Dips",target:"Triceps",img:MUSCLES.arms,met:7},{name:"Superman",target:"Lombaires",img:MUSCLES.back,met:4}],
+        lower:[{name:"Squats",target:"Cuisses",img:MUSCLES.legs,met:8},{name:"Fentes",target:"Jambes",img:MUSCLES.legs,met:7},{name:"Pont fessier",target:"Fessiers",img:MUSCLES.glutes,met:5}],
+        fullbody:[{name:"Burpees",target:"Cardio/Complet",img:MUSCLES.warmup,met:14},{name:"Climbers",target:"Abdominaux",img:MUSCLES.abs,met:10},{name:"Jumping Jacks",target:"Cardio",img:MUSCLES.warmup,met:9}]
+    },
+    gym:{
+        upper:[{name:"Dév. Couché",target:"Pecs",img:MUSCLES.chest,met:9},{name:"Tirage Dos",target:"Dorsaux",img:MUSCLES.back,met:8},{name:"Dév. Militaire",target:"Épaules",img:MUSCLES.shoulders,met:8}],
+        lower:[{name:"Presse",target:"Quadriceps",img:MUSCLES.legs,met:9},{name:"Squat Barre",target:"Cuisses",img:MUSCLES.legs,met:10},{name:"SDT",target:"Ischios",img:MUSCLES.back,met:12}],
+        fullbody:[{name:"KB Swing",target:"Chaîne Post.",img:MUSCLES.glutes,met:12},{name:"Thrusters",target:"Épaules/Jambes",img:MUSCLES.shoulders,met:13},{name:"Renegade Row",target:"Dos/Core",img:MUSCLES.back,met:10}]
+    }
+};
+const RPM_DATA=[
+    {name:"Plat Rapide",rpm:100,res:"Plat",target:"Vitesse",img:MUSCLES.legs,met:9},
+    {name:"Montée de Col",rpm:70,res:"Grosse côte",target:"Force",img:MUSCLES.legs,met:12},
+    {name:"Sprint Final",rpm:115,res:"Légère côte",target:"Puissance",img:MUSCLES.legs,met:15},
+    {name:"Récup active",rpm:85,res:"Plat",target:"Souffle",img:MUSCLES.warmup,met:7}
+];
+
+function speak(t){const u=new SpeechSynthesisUtterance(t);u.lang='fr-FR';u.rate=1.1;synth.speak(u);}
+function speakImmediate(t){synth.cancel();speak(t);}
+function formatTime(s){return`${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;}
+
+function selectActivity(a){selectedActivity=a;showOnly('duration-screen');}
+function selectDuration(d){
+    selectedDuration=d;
+    userWeight=parseFloat(document.getElementById('user-weight').value)||70;
+    showOnly(selectedActivity==='rpm'?'difficulty-screen':'equipment-screen');
+}
+function selectEquipment(e){selectedEquipment=e;showOnly('body-part-screen');}
+
+function generateProgram(opt){
+    currentWorkout=[];let elapsed=0;const totalSec=selectedDuration*60;
+    if(selectedActivity==='rpm'){
+        const mod=(opt==='beginner')?-10:(opt==='advanced')?10:0;
+        currentWorkout.push({name:"Échauffement",duration:180,rpm:75+mod,res:"Plat",target:"Mobilisation",img:MUSCLES.warmup,met:6});
+        elapsed=180;
+        while(elapsed<totalSec-180){
+            const p={...RPM_DATA[Math.floor(Math.random()*RPM_DATA.length)]};p.rpm+=mod;
+            const dur=Math.min(120,totalSec-180-elapsed);
+            currentWorkout.push({...p,duration:dur});elapsed+=dur;
         }
-
-        function showPreview() {
-            document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
-            document.getElementById('preview-screen').classList.remove('hidden');
-            const list = document.getElementById('preview-list'); list.innerHTML = '';
-            currentWorkout.forEach(s => {
-                list.innerHTML += `<div class="step-item"><img src="${s.img}"><div><b>${s.name}</b><div style="font-size:0.6rem">${formatTime(s.duration)} | ${s.target}</div></div></div>`;
-            });
+        currentWorkout.push({name:"Retour au calme",duration:180,rpm:70+mod,res:"Plat",target:"Récup",img:MUSCLES.warmup,met:5});
+    } else {
+        const pool=MUSCU_DATA[selectedEquipment][opt];
+        currentWorkout.push({name:"Échauffement",duration:180,target:"Articulations",res:"Mobilisation",img:MUSCLES.warmup,met:4});
+        elapsed=180;
+        while(elapsed<totalSec-120){
+            const ex={...pool[Math.floor(Math.random()*pool.length)]};
+            currentWorkout.push({...ex,duration:45,isRest:false,res:"TRAVAIL"});elapsed+=45;
+            if(elapsed<totalSec-120){currentWorkout.push({name:"Repos",duration:15,isRest:true,res:"REPOS",img:MUSCLES.rest,target:"Oxygène",met:2});elapsed+=15;}
         }
+        currentWorkout.push({name:"Étirements",duration:120,target:"Souplesse",res:"Fin",img:MUSCLES.rest,met:3});
+    }
+    showPreview();
+}
 
-        function startWorkout() {
-            document.getElementById('preview-screen').classList.add('hidden');
-            document.getElementById('workout-screen').classList.remove('hidden');
-            const list = document.getElementById('interactive-list'); list.innerHTML = '';
-            currentWorkout.forEach((s, i) => {
-                const item = document.createElement('div'); item.className = "step-item"; item.id = `step-${i}`;
-                item.onclick = () => jumpToStep(i);
-                item.innerHTML = `<img src="${s.img}"><div><b>${s.name}</b><div style="font-size:0.6rem">${formatTime(s.duration)}</div></div>`;
-                list.appendChild(item);
-            });
-            currentStepIndex = 0; totalCalories = 0; isPaused = false; startStep();
-        }
+function showPreview(){
+    showOnly('preview-screen');
+    const list=document.getElementById('preview-list');list.innerHTML='';
+    currentWorkout.forEach(s=>{
+        list.innerHTML+=`<div class="step-item"><img src="${s.img}" onerror="this.style.display='none'"><div class="step-info"><b>${s.name}</b><div class="step-sub">${formatTime(s.duration)} · ${s.target||s.res||''}</div></div></div>`;
+    });
+}
 
-        function jumpToStep(idx) { currentStepIndex = idx; isPaused = false; startStep(); }
+function startWorkout(){
+    showOnly('workout-screen');
+    const panel=document.getElementById('steps-panel');
+    panel.innerHTML='';
+    currentWorkout.forEach((s,i)=>{
+        const item=document.createElement('div');
+        item.className='step-item';
+        item.id=`step-${i}`;
+        item.innerHTML=`
+            <span class="step-num">${i+1}</span>
+            <img src="${s.img}" onerror="this.style.display='none'">
+            <div class="step-info">
+                <b>${s.name}</b>
+                <div class="step-sub">${formatTime(s.duration)} · ${s.target||s.res||''}</div>
+            </div>
+            <button class="step-jump-btn" onclick="event.stopPropagation();jumpToStep(${i})">▶ ICI</button>
+        `;
+        item.onclick=()=>jumpToStep(i);
+        panel.appendChild(item);
+    });
+    currentStepIndex=0;totalCalories=0;isPaused=false;
+    startStep();
+}
 
-        function startStep() {
-            const s = currentWorkout[currentStepIndex]; if(!s) return;
-            timeRemaining = s.duration;
-            speakImmediate(selectedActivity==='rpm' ? `${s.name}. ${s.rpm} RPM.` : (s.isRest?"Repos":`Exercice : ${s.name}`));
+function jumpToStep(idx){
+    currentStepIndex=idx;isPaused=false;
+    document.getElementById('play-pause-btn').innerHTML='‖';
+    startStep();
+}
+function skipStep(){
+    if(currentStepIndex<currentWorkout.length-1){currentStepIndex++;isPaused=false;startStep();}
+}
+function startStep(){
+    const s=currentWorkout[currentStepIndex];if(!s)return;
+    timeRemaining=s.duration;
+    speakImmediate(selectedActivity==='rpm'?`${s.name}. ${s.rpm} RPM.`:(s.isRest?'Repos':`Exercice : ${s.name}`));
+    if(timerInterval)clearInterval(timerInterval);
+    updateUI();
+    timerInterval=setInterval(()=>{
+        if(!isPaused){
+            timeRemaining--;
+            totalCalories+=((s.met||7)*userWeight/3600);
             updateUI();
-            if(timerInterval) clearInterval(timerInterval);
-            timerInterval = setInterval(() => {
-                if(!isPaused) {
-                    timeRemaining--; totalCalories += ((s.met||7) * userWeight * (1/3600));
-                    updateUI();
-                    if(timeRemaining === 10) speak("Dix secondes");
-                    else if(timeRemaining > 0 && timeRemaining <= 5) speak(timeRemaining.toString());
-                    if(timeRemaining <= 0) { currentStepIndex++; if(currentStepIndex < currentWorkout.length) startStep(); else finishWorkout(); }
-                }
-            }, 1000);
+            if(timeRemaining===10)speak('Dix secondes');
+            else if(timeRemaining>0&&timeRemaining<=5)speak(timeRemaining.toString());
+            if(timeRemaining<=0){currentStepIndex++;if(currentStepIndex<currentWorkout.length)startStep();else finishWorkout();}
         }
+    },1000);
+}
 
-        function updateUI() {
-            const s = currentWorkout[currentStepIndex]; if(!s) return;
-            document.getElementById('phase-name').innerText = s.name;
-            document.getElementById('timer').innerText = formatTime(timeRemaining);
-            document.getElementById('live-calories').innerText = Math.floor(totalCalories);
-            document.getElementById('main-exercise-img').src = s.img;
-            document.getElementById('res-text').innerText = s.res.toUpperCase();
-            
-            let total = timeRemaining; for(let i=currentStepIndex+1; i<currentWorkout.length; i++) total += currentWorkout[i].duration;
-            document.getElementById('total-remaining-display').innerText = `T: ${formatTime(total)}`;
-
-            if(selectedActivity==='rpm') {
-                document.getElementById('dash-val-1').innerText = s.rpm;
-                document.getElementById('dash-val-2').innerText = s.target;
-            } else {
-                document.getElementById('dash-val-1').innerText = formatTime(timeRemaining);
-                const next = currentWorkout[currentStepIndex+1];
-                document.getElementById('dash-val-2').innerText = next ? (next.isRest?"Repos":next.target) : "Fin";
-            }
-
-            const circ = 377;
-            document.getElementById('progress-circle').style.strokeDashoffset = circ - (timeRemaining/s.duration)*circ;
-
-            // Navigation visuelle et auto-scroll
-            currentWorkout.forEach((_, i) => {
-                const el = document.getElementById(`step-${i}`);
-                if(el) {
-                    el.className = "step-item " + (i===currentStepIndex?"active-step":(i<currentStepIndex?"opacity-30":""));
-                    if(i===currentStepIndex) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
-            });
+function updateUI(){
+    const s=currentWorkout[currentStepIndex];if(!s)return;
+    document.getElementById('phase-name').innerText=s.name;
+    document.getElementById('phase-name-meta').innerText=s.name;
+    document.getElementById('phase-sub-meta').innerText=(s.res||'').toUpperCase();
+    document.getElementById('timer').innerText=formatTime(timeRemaining);
+    document.getElementById('live-calories').innerText=Math.floor(totalCalories);
+    let tot=timeRemaining;
+    for(let i=currentStepIndex+1;i<currentWorkout.length;i++)tot+=currentWorkout[i].duration;
+    document.getElementById('total-rem').innerText=`T: ${formatTime(tot)}`;
+    const next=currentWorkout[currentStepIndex+1];
+    document.getElementById('next-step-preview').innerText=next?`▶ ${next.name}`:'Fin de séance';
+    if(selectedActivity==='rpm'){
+        document.getElementById('stat-label-1').innerText='RPM';
+        document.getElementById('dash-val-1').innerText=s.rpm||'--';
+    } else {
+        document.getElementById('stat-label-1').innerText=s.isRest?'REPOS':'WORK';
+        document.getElementById('dash-val-1').innerText=formatTime(timeRemaining);
+    }
+    document.getElementById('progress-circle').style.strokeDashoffset=188.5-(timeRemaining/s.duration)*188.5;
+    currentWorkout.forEach((_,i)=>{
+        const el=document.getElementById(`step-${i}`);if(!el)return;
+        el.classList.remove('active-step','done-step');
+        if(i===currentStepIndex){
+            el.classList.add('active-step');
+            const panel=document.getElementById('steps-panel');
+            const eTop=el.offsetTop,eBot=eTop+el.offsetHeight;
+            const pTop=panel.scrollTop,pBot=pTop+panel.clientHeight;
+            if(eTop<pTop||eBot>pBot)el.scrollIntoView({behavior:'smooth',block:'nearest'});
+        } else if(i<currentStepIndex){
+            el.classList.add('done-step');
         }
+    });
+}
 
-        function formatTime(s) { return `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`; }
-        function togglePause() { isPaused = !isPaused; synth.cancel(); }
-        function requestQuit() { isPaused=true; document.getElementById('quit-modal').classList.remove('hidden'); }
-        function closeQuitModal() { document.getElementById('quit-modal').classList.add('hidden'); isPaused=false; }
-        function confirmQuit() { resetApp(); }
-        function resetApp() { location.reload(); }
-
-        function finishWorkout() {
-            clearInterval(timerInterval);
-            document.getElementById('workout-screen').classList.add('hidden');
-            document.getElementById('finish-screen').classList.remove('hidden');
-            document.getElementById('final-calories').innerText = Math.floor(totalCalories);
-            speakImmediate("Séance terminée ! Bravo.");
-        }
-    </script>
+function formatTime(s){return`${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;}
+function togglePause(){isPaused=!isPaused;document.getElementById('play-pause-btn').innerHTML=isPaused?'▶':'‖';if(isPaused)synth.cancel();}
+function requestQuit(){isPaused=true;document.getElementById('quit-modal').classList.remove('hidden');}
+function closeQuitModal(){document.getElementById('quit-modal').classList.add('hidden');isPaused=false;}
+function confirmQuit(){resetApp();}
+function resetApp(){location.reload();}
+function finishWorkout(){
+    clearInterval(timerInterval);showOnly('finish-screen');
+    document.getElementById('final-calories').innerText=Math.floor(totalCalories);
+    speakImmediate('Séance terminée ! Bravo.');
+}
+</script>
 </body>
 </html>
-
